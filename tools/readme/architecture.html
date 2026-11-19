@@ -1,0 +1,38 @@
+<!doctype html><html data-theme="dautel"><head><meta charset="utf-8">
+<link rel="stylesheet" href="{{ASSETS}}/fonts/fonts.css"><link rel="stylesheet" href="{{ASSETS}}/dautel.css"><link rel="stylesheet" href="_base.css">
+<style>
+.frame { width: 1280px; height: 660px; }
+.node { padding: 16px 18px; }
+.title { position: absolute; left: 48px; top: 22px; font-family: var(--font-mono); font-size: 15px; color: var(--muted); }
+.title b { color: var(--blue); }
+.row { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: var(--radius-xs); background: var(--ink-soft); font-size: 13.5px; color: var(--text); }
+.row span { color: var(--muted); }
+.flow { margin-top: 12px; font-size: 12.5px; color: var(--mint); }
+</style></head><body><div class="frame">
+<div class="title"><b>&gt;_</b> How OpsBrain fits together</div>
+<svg class="lines" width="1280" height="660" viewBox="0 0 1280 660">
+  <path d="M348 135 H394 V265 H440"/><path d="M348 300 H440"/><path d="M348 465 H394 V335 H440"/>
+  <path d="M640 210 V150"/>
+  <path d="M840 245 H930"/>
+  <path d="M840 540 H895 V270 H930"/>
+  <path d="M840 585 H930"/>
+  <rect x="436.5" y="261.5" width="7" height="7"/><rect x="436.5" y="296.5" width="7" height="7"/><rect x="436.5" y="331.5" width="7" height="7"/>
+  <rect x="636.5" y="146.5" width="7" height="7"/><rect x="926.5" y="241.5" width="7" height="7"/><rect x="926.5" y="266.5" width="7" height="7"/>
+  <rect x="926.5" y="581.5" width="7" height="7"/>
+  <text x="852" y="236">SQL</text><text x="852" y="531">reads</text><text x="852" y="576">writes</text>
+</svg>
+<div class="node lavender" style="left:48px;top:70px;width:300px;height:130px"><h3>People</h3><p>Owner and staff. The web UI for the CRM and approvals, MCP from their own AI tools. Only people approve.</p></div>
+<div class="node blue" style="left:48px;top:235px;width:300px;height:130px"><h3>AI agents</h3><p>Claude Code, Codex, OpenClaw, Hermes. MCP with their own key, or acting as a role through a session key.</p></div>
+<div class="node mint" style="left:48px;top:400px;width:300px;height:130px"><h3>Services</h3><p>Session keys and integrations, delegated to act for agents. Every record shows both identities.</p></div>
+<div class="node mint" style="left:470px;top:40px;width:340px;height:110px"><h3>Embeddings</h3><p>Local Ollama with nomic-embed-text: semantic search without sending text anywhere.</p></div>
+<div class="node blue" style="left:440px;top:210px;width:400px;height:190px"><h3><span>&gt;_</span> OpsBrain server</h3>
+  <div class="row">POST /mcp <span>· tools for agents</span></div>
+  <div class="row">/crm &nbsp;/approvals <span>· web UI for people</span></div>
+  <div class="flow">key → acting_as → permissions → attribution</div></div>
+<div class="node lavender" style="left:930px;top:140px;width:300px;height:205px"><h3>Postgres + pgvector</h3>
+  <p>Private, on your server. Approval, screen and won-deal rules are database triggers.</p>
+  <span class="chip">records</span><span class="chip">CRM</span><span class="chip">principals</span><span class="chip">keys</span><span class="chip">history</span><span class="chip">links</span></div>
+<div class="node blue" style="left:440px;top:480px;width:400px;height:150px"><h3>PARA exporter</h3><p>00:00 · 06:00 · 12:00 · 18:00</p>
+  <span class="chip">1-Projects</span><span class="chip">2-Areas</span><span class="chip">3-Resources</span><span class="chip">4-Archive</span></div>
+<div class="node mint" style="left:930px;top:480px;width:300px;height:150px"><h3>Markdown mirror</h3><p>para-output/ for the team, para-restricted/ owner only. Read it in any editor or Obsidian.</p></div>
+</div></body></html>
