@@ -104,5 +104,11 @@ Then try `whoami` with `acting_as` set to one of the listed agents.
 | `stats` | Counts by type and status, pending approvals. |
 | `capture_thought`, `search_thoughts`, `list_thoughts`, `thought_stats` | Open Brain compatible tools, so existing prompts and skills keep working. Thoughts are stored as `note` records with attribution. |
 | `search`, `fetch` | Read-only tools for clients that expect them. |
+| `crm_upsert_company`, `crm_upsert_contact`, `crm_upsert_deal` | Create or update CRM companies (matched by domain), contacts (matched by email) and deals |
+| `crm_log_activity` | Log a call, email, meeting, message or note against a company, contact or deal |
+| `crm_get`, `crm_search`, `crm_list`, `crm_pipeline` | Read the CRM: one entry with everything linked, search, filtered lists, and the pipeline with forecast and what needs attention |
+| `crm_screen_company`, `crm_start_engagement` | Decide a company's screen (approvers only); turn a won deal into an engagement project |
 
-Every write tool accepts `acting_as` (an agent handle) when your key is delegated.
+Every write tool accepts `acting_as` (an agent handle) when your key is delegated. `create_record`, `update_record` and `list_records` also take `company`, `contact` and `deal` to link records to the CRM. Details: [CRM](07-crm.md).
+
+People don't need an AI client for the CRM or approvals: they use the web UI at `<OPSBRAIN_PUBLIC_URL>/crm`.

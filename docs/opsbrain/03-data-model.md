@@ -90,8 +90,14 @@ These rules hold no matter which client or agent writes the record:
 
 For Dautel Intelligent Operations this encodes the owner's rule: final deployments to customers, financial transactions and any decision with financial or ethical considerations need the owner's approval; everything else is decided by the accountable owner without escalation.
 
+## CRM
+
+The CRM adds `crm_companies`, `crm_contacts`, `crm_pipeline_stages`, `crm_deals` and their history in `crm_events`, with the same attribution columns as records. Activities are records of type `activity`. Records link to the CRM through `crm_company_id`, `crm_contact_id` and `crm_deal_id`; projects through `crm_company_id`. Two more database rules: only a person with approval rights can clear or decline a company's screen, and only a person with approval rights can mark a deal won. See [CRM](07-crm.md).
+
+The web UI stores sessions in `ops_ui_sessions` (hashed session IDs, expiry, CSRF token).
+
 ## What OpsBrain is the system of record for
 
-Everything about how the company runs: task cards, QA records, decisions and approvals, process improvement (kaizen), meeting notes, risks, incidents, changes, support requests, the sales pipeline, proposal, invoice and contract records, hiring records, feedback, plans, reports, retrospectives, playbooks, SOPs, templates, research and policies.
+Everything about how the company runs: task cards, QA records, decisions and approvals, process improvement (kaizen), meeting notes, risks, incidents, changes, support requests, the CRM (companies, contacts, deals, activities), proposal, invoice and contract records, hiring records, feedback, plans, reports, retrospectives, playbooks, SOPs, templates, research and policies.
 
 **Not stored in OpsBrain:** client deliverables (code, documents, designs, data you produce for a client) and client confidential data or credentials. Those live in the client's own systems or your delivery repositories and document store. OpsBrain records point to them by reference.

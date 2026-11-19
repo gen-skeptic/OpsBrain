@@ -9,10 +9,11 @@ One database, one MCP endpoint, every person and every agent, each with their ow
   <a href="docs/opsbrain/03-data-model.md">Data model</a> ·
   <a href="docs/opsbrain/04-para-mirror.md">PARA mirror</a> ·
   <a href="docs/opsbrain/05-security-and-privacy.md">Security and privacy</a> ·
-  <a href="docs/opsbrain/06-agent-conventions.md">Agent conventions</a>
+  <a href="docs/opsbrain/06-agent-conventions.md">Agent conventions</a> ·
+  <a href="docs/opsbrain/07-crm.md">CRM</a>
 </p>
 
-OpsBrain is the memory and system of record for **Dautel Intelligent Operations**: task cards, QA records, decisions and approvals, process improvement, meetings, risks, incidents, the sales pipeline, invoice and contract records, hiring, playbooks, SOPs and research. Everything about how the company runs, except client deliverables.
+OpsBrain is the memory and system of record for **Dautel Intelligent Operations**: task cards, QA records, decisions and approvals, process improvement, meetings, risks, incidents, a built-in **CRM** (companies, contacts, deal pipeline, activities), invoice and contract records, hiring, playbooks, SOPs and research. Everything about how the company runs, except client deliverables. Agents work through MCP; people use a private web UI for the CRM and the approval queue.
 
 It is self-hosted and private. It runs on our own servers, clients never see it, and nothing in it is published.
 
@@ -29,7 +30,9 @@ It is self-hosted and private. It runs on our own servers, clients never see it,
 | Privacy | All or nothing | `company` or `restricted` visibility, enforced in the database on every read |
 | Decisions | n/a | Financial and ethical decisions require approval by a person with approval rights, **enforced by a database trigger** |
 | Organization | Tags | PARA: projects (client engagements and internal), areas of responsibility, resources, archive |
-| Human-readable copy | n/a | A markdown mirror organized with PARA, regenerated **four times a day** |
+| CRM | n/a | Companies, contacts, a deal pipeline with weighted forecast, and activities, linked to proposals, contracts, invoices and engagements. Employer-boundary screens and won deals are approver-only, **enforced by the database** |
+| Interface for people | n/a | A private **web UI** (pipeline board, companies, contacts, deals, approval queue, record view) in the Dautel Design System. Sign in with your key or through SSO |
+| Human-readable copy | n/a | A markdown mirror organized with PARA, regenerated **four times a day** (including CRM pages) |
 | Hosting | Supabase (cloud) | Self-hosted: Docker Compose or Kubernetes, Postgres + pgvector, local embeddings with Ollama |
 | Compatibility | | Open Brain tools (`capture_thought`, `search_thoughts`, `list_thoughts`, `thought_stats`) still work |
 
@@ -41,13 +44,15 @@ It is self-hosted and private. It runs on our own servers, clients never see it,
      │ own key                  │ own key, or acting_as        │ delegated key
      └──────────────────────────┼──────────────────────────────┘
                                 ▼
-                 OpsBrain MCP server  (Deno, POST /mcp, stateless)
-                 authenticate key → resolve acting_as → check permissions
+                 OpsBrain server (Deno)
+                 POST /mcp: authenticate key → resolve acting_as → check permissions
+                 /crm, /approvals: web UI for people (session, CSRF, SSO optional)
                                 │
                                 ▼
        Postgres + pgvector (private)         ──►  PARA exporter (00:00, 06:00, 12:00, 18:00)
        principals, keys, delegations               para-output/
-       records (thoughts + company columns)          1-Projects/  2-Areas/  3-Resources/  4-Archive/
+       records (thoughts + company columns)          1-Projects/  2-Areas/ (incl. CRM/)  3-Resources/  4-Archive/
+       CRM: companies, contacts, deals, stages
        events, links, projects, areas, processes   para-restricted/  (restricted records only, optional)
        approval trigger, visibility function
                                 ▲
@@ -102,21 +107,25 @@ claude mcp add --transport http --scope user opsbrain https://opsbrain.example.i
 
 Ask: "Call whoami on OpsBrain."
 
+Open the web UI at `https://opsbrain.example.internal/crm` and sign in with your key (people only). See [CRM](docs/opsbrain/07-crm.md) for single sign-on and your own pipeline stages.
+
 ## Using OpsBrain with the experts repo
 
 The [experts](https://github.com/gen-skeptic/experts) repo (the Dautel company handbook and its 48 harness-neutral agents) uses OpsBrain as its memory and system of record:
 
 - `opsbrain/seed.json` in experts defines the areas, the 45 work processes, all 48 agents and the session service principal. Load it with `ob seed`.
 - Agents write task cards, QA records, decisions, kaizen cards and hand-offs through the OpsBrain tools, following [Agent conventions](docs/opsbrain/06-agent-conventions.md).
-- Decisions with financial or ethical considerations, final deployments to customers and financial transactions wait in OpsBrain for the owner's approval.
+- Decisions with financial or ethical considerations, final deployments to customers and financial transactions wait in OpsBrain for the owner's approval (in the web UI's approval queue).
+- Sales runs in the CRM: the seed sets DIO's pipeline stages (P02 lead to proposal), prospects that need the employer-boundary screen are flagged, and a won deal becomes the engagement project.
 
 ## Repository layout
 
 ```text
-server/            MCP server: auth, permissions, records, tools, HTTP app
+server/            MCP server: auth, permissions, records, CRM, tools, HTTP app
+server/ui/         web UI for people: sessions, pages, Dautel Design System assets
 db/migrations/     SQL migrations (applied once each by db/migrate.ts)
 admin/             opsbrain-admin CLI: principals, keys, delegations, areas, projects, seed, reembed
-para/              PARA markdown exporter and its four-times-a-day scheduler
+para/              PARA markdown exporter (records and CRM pages) and its four-times-a-day scheduler
 deploy/            Dockerfile, docker-compose.yml, .env.example, seed.example.json, k8s/
 tests/             unit tests and end-to-end tests against a real Postgres
 docs/opsbrain/     OpsBrain documentation

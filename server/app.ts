@@ -5,6 +5,7 @@ import { authenticate } from "./auth.ts";
 import { buildServer } from "./tools.ts";
 import { config } from "./config.ts";
 import { db } from "./db.ts";
+import { mountUi } from "./ui/routes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,6 +49,9 @@ export function buildApp(): Hono {
       return c.json({ ok: false }, 503);
     }
   });
+
+  // Web UI for people (CRM, approvals). Registered before the MCP catch-all; agents use MCP.
+  if (config.uiEnabled) mountUi(app);
 
   // OpsBrain runs stateless: no server-initiated SSE stream and no sessions. Per the MCP spec, answer GET
   // and DELETE with 405 so clients use plain POST instead of holding open (or retrying) an empty stream.

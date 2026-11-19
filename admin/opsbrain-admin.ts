@@ -14,6 +14,7 @@
 import { closeDb, db, vectorLiteral } from "../server/db.ts";
 import { newRawKey, sha256Hex } from "../server/auth.ts";
 import { embed } from "../server/ai.ts";
+import { seedStages } from "../server/crm.ts";
 
 type Flags = Record<string, string | boolean>;
 
@@ -45,6 +46,8 @@ type Seed = {
   processes?: { id: string; name: string; area?: string; owner?: string; metadata?: Record<string, unknown> }[];
   delegations?: { principal: string; may_act_as: string[] | "all-agents" }[];
   projects?: { id: string; name: string; kind?: string; client_name?: string; status?: string; area?: string; owner?: string; description?: string }[];
+  /** CRM pipeline stages, in order. Replaces the active set; stages not listed are deactivated, never deleted. */
+  pipeline_stages?: { slug: string; name: string; probability?: number; is_won?: boolean; is_lost?: boolean; gate_screen?: boolean; description?: string }[];
 };
 
 async function upsertPrincipal(p: NonNullable<Seed["principals"]>[number]) {
@@ -95,7 +98,14 @@ async function seed(path: string) {
               ${p.owner ? await idOf(p.owner) : null}, ${p.description ?? null})
       ON CONFLICT (id) DO NOTHING`;
   }
-  console.log(`Seeded ${principals.length} principals, ${data.areas?.length ?? 0} areas, ${data.processes?.length ?? 0} processes, ${data.delegations?.length ?? 0} delegation sets, ${data.projects?.length ?? 0} projects`);
+  if (data.pipeline_stages?.length) {
+    const stages = data.pipeline_stages;
+    if (stages.filter((x) => x.is_won).length !== 1 || stages.filter((x) => x.is_lost).length !== 1) {
+      throw new Error("pipeline_stages needs exactly one won stage and one lost stage");
+    }
+    await seedStages(stages);
+  }
+  console.log(`Seeded ${principals.length} principals, ${data.areas?.length ?? 0} areas, ${data.processes?.length ?? 0} processes, ${data.delegations?.length ?? 0} delegation sets, ${data.projects?.length ?? 0} projects, ${data.pipeline_stages?.length ?? 0} pipeline stages`);
 }
 
 // Commands that are one word; the rest are "<group> <verb>" (principal add, key issue, ...).

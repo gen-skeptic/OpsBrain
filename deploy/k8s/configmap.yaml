@@ -7,6 +7,11 @@ data:
   OPSBRAIN_PUBLIC_URL: https://opsbrain.example.internal
   OPSBRAIN_ALLOW_QUERY_KEY: "true"
   OPSBRAIN_MAX_RECORD_CHARS: "50000"
+  # Web UI for people at /crm. For SSO set OPSBRAIN_UI_AUTH to both and put OPSBRAIN_UI_PROXY_SECRET in the Secret.
+  OPSBRAIN_UI_ENABLED: "true"
+  OPSBRAIN_UI_AUTH: key
+  OPSBRAIN_UI_USER_HEADER: X-authentik-username
+  OPSBRAIN_UI_THEME: dautel
   # Any OpenAI-compatible embeddings endpoint inside your network (Ollama, vLLM, LiteLLM).
   EMBEDDING_PROVIDER: openai
   EMBEDDING_API_BASE: http://ollama.ai.svc.cluster.local:11434/v1
@@ -16,6 +21,8 @@ data:
   TZ: America/New_York
   PARA_TITLE: OpsBrain
   PARA_ARCHIVE_AFTER_DAYS: "30"
+  PARA_CRM_FOLDER: CRM
+  PARA_CRM_CONTACT_DETAILS: "false"
   PARA_OUTPUT_DIR: /data/para/company
   # Restricted records go to a separate folder on the same volume; restrict who can read it.
   PARA_RESTRICTED_DIR: /data/para/restricted

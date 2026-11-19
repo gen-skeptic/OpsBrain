@@ -35,4 +35,15 @@ export const config = {
   get llmApiBase() { return env("LLM_API_BASE", "http://ollama:11434/v1").replace(/\/$/, ""); },
   get llmApiKey() { return env("LLM_API_KEY", ""); },
   get llmModel() { return env("LLM_MODEL", "llama3.1:8b"); },
+
+  // Web UI (CRM and approvals) for people. Agents use MCP.
+  get uiEnabled() { return bool("OPSBRAIN_UI_ENABLED", true); },
+  /** key: sign in with your OpsBrain key; header: SSO through a trusted reverse proxy; both. */
+  get uiAuth() { return env("OPSBRAIN_UI_AUTH", "key") as "key" | "header" | "both"; },
+  get uiUserHeader() { return env("OPSBRAIN_UI_USER_HEADER", "X-authentik-username"); },
+  /** Required for header sign-in: the proxy must send it in X-OpsBrain-Proxy-Secret. */
+  get uiProxySecret() { return env("OPSBRAIN_UI_PROXY_SECRET", ""); },
+  get uiSessionHours() { return Number(env("OPSBRAIN_UI_SESSION_HOURS", "12")); },
+  get uiTheme() { return env("OPSBRAIN_UI_THEME", "dautel"); },
+  get uiTitle() { return env("OPSBRAIN_UI_TITLE", "OpsBrain"); },
 };

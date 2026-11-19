@@ -6,7 +6,9 @@ import { embed, extractTags } from "./ai.ts";
 import { config } from "./config.ts";
 import { AccessError, type Ctx, principalByHandle } from "./auth.ts";
 
-export class InputError extends Error {}
+export { InputError } from "./errors.ts";
+import { InputError } from "./errors.ts";
+import { resolveCompanyId, resolveContactId, resolveDealId } from "./crm_refs.ts";
 
 export type RecordInput = {
   record_type?: string;
@@ -31,7 +33,22 @@ export type RecordInput = {
   financial_or_ethical?: boolean;
   requires_approval?: boolean;
   metadata?: Record<string, unknown>;
+  /** CRM links: company (ID, domain or exact name), contact (ID, email or exact name), deal (ID or exact name). */
+  company?: string;
+  contact?: string;
+  deal?: string;
 };
+
+/** Resolve CRM links; a deal or contact implies its company when none is given. */
+async function crmLinks(input: { company?: string; contact?: string; deal?: string }) {
+  const company = await resolveCompanyId(input.company);
+  const contact = await resolveContactId(input.contact);
+  const deal = await resolveDealId(input.deal);
+  let companyId = company;
+  if (!companyId && deal) companyId = (await db()`SELECT company_id FROM crm_deals WHERE id = ${deal}`)[0].company_id;
+  if (!companyId && contact) companyId = (await db()`SELECT company_id FROM crm_contacts WHERE id = ${contact}`)[0].company_id;
+  return { crm_company_id: companyId, crm_contact_id: contact, crm_deal_id: deal };
+}
 
 const READ_FILTER = `ops_can_read($1, visibility, owner_id, assignee_id, created_by_id, allowed_principals)`;
 
@@ -112,6 +129,7 @@ export async function createRecord(ctx: Ctx, input: RecordInput) {
   const embedding = await embeddingFor(input.title, content);
   const tags = recordType === "note" ? await extractTags(content) : {};
   const metadata = { ...(input.metadata ?? {}), ...(Object.keys(tags).length ? { extracted: tags } : {}) };
+  const crm = await crmLinks(input);
 
   return await db().begin(async (tx) => {
     const [row] = await tx`
@@ -119,7 +137,7 @@ export async function createRecord(ctx: Ctx, input: RecordInput) {
         content, embedding, metadata, record_type, title, status, external_ref, project_id, area_slug,
         process_id, process_step, para_override, resource_topic, owner_id, assignee_id, created_by,
         updated_by, authenticated_as, on_behalf_of, priority, due_on, tags, fields, visibility,
-        allowed_principals, financial_or_ethical, requires_approval)
+        allowed_principals, financial_or_ethical, requires_approval, crm_company_id, crm_contact_id, crm_deal_id)
       VALUES (
         ${content}, ${embedding}::vector, ${tx.json(metadata as never)}, ${recordType}, ${input.title ?? null},
         ${input.status ?? null}, ${input.external_ref ?? null}, ${input.project_id ?? null}, ${input.area ?? null},
@@ -127,7 +145,7 @@ export async function createRecord(ctx: Ctx, input: RecordInput) {
         ${ownerId}, ${assigneeId}, ${ctx.actor.id}, ${ctx.actor.id}, ${ctx.auth.id}, ${ctx.onBehalfOf},
         ${input.priority ?? null}, ${input.due_on ?? null}, ${input.tags ?? []}::text[], ${tx.json((input.fields ?? {}) as never)},
         ${input.visibility ?? "company"}, ${allowed}::uuid[], ${input.financial_or_ethical ?? false},
-        ${input.requires_approval ?? false})
+        ${input.requires_approval ?? false}, ${crm.crm_company_id}, ${crm.crm_contact_id}, ${crm.crm_deal_id})
       RETURNING id, version, approval_status`;
     await logEvent(tx, row.id, ctx, "create", { record_type: recordType, title: input.title ?? null });
     return { id: row.id as string, version: row.version as number, approval_status: row.approval_status, embedded: embedding !== null };
@@ -181,6 +199,15 @@ export async function updateRecord(ctx: Ctx, ref: string, input: UpdateInput) {
   if (input.fields !== undefined) {
     set.fields = { ...(r.fields ?? {}), ...input.fields };
     note("fields", Object.keys(input.fields), null);
+  }
+  for (const [key, col, resolve] of [
+    ["company", "crm_company_id", resolveCompanyId], ["contact", "crm_contact_id", resolveContactId], ["deal", "crm_deal_id", resolveDealId],
+  ] as const) {
+    const v = input[key];
+    if (v !== undefined) {
+      const id = v === "" ? null : await resolve(v);
+      if (id !== r[col]) { set[col] = id; note(col, r[col] ?? null, id); }
+    }
   }
   if (input.assignee !== undefined) {
     set.assignee_id = await handleToId(input.assignee, "assignee");
@@ -311,11 +338,14 @@ export type ListFilters = {
   record_type?: string; status?: string; project_id?: string; area?: string; process_id?: string;
   owner?: string; assignee?: string; created_by?: string; approval_status?: string; tag?: string;
   updated_since?: string; text?: string; include_archived?: boolean; limit?: number;
+  company?: string; contact?: string; deal?: string;
 };
 
 const LIST_COLUMNS = `id, record_type, title, status, external_ref, project_id, area_slug, process_id, process_step,
   owner, assignee, created_by, updated_by, on_behalf_of, priority, due_on, tags, visibility, financial_or_ethical,
-  requires_approval, approval_status, approved_by, version, archived_at, created_at, updated_at`;
+  requires_approval, approval_status, approved_by, version, archived_at, created_at, updated_at,
+  crm_company_id, crm_company_name, crm_contact_id, crm_contact_name, crm_deal_id, crm_deal_name, fields,
+  left(content, 600) AS excerpt`;
 
 export async function listRecords(ctx: Ctx, f: ListFilters) {
   const where: string[] = [READ_FILTER];
@@ -334,6 +364,9 @@ export async function listRecords(ctx: Ctx, f: ListFilters) {
   if (f.tag) add("? = ANY(tags)", f.tag);
   if (f.updated_since) add("updated_at >= ?::timestamptz", f.updated_since);
   if (f.text) add("(coalesce(title,'') || ' ' || content) ILIKE '%' || ? || '%'", f.text);
+  if (f.company) add("crm_company_id = ?::uuid", await resolveCompanyId(f.company));
+  if (f.contact) add("crm_contact_id = ?::uuid", await resolveContactId(f.contact));
+  if (f.deal) add("crm_deal_id = ?::uuid", await resolveDealId(f.deal));
   const limit = Math.min(Math.max(f.limit ?? 20, 1), 100);
   return await db().unsafe(
     `SELECT ${LIST_COLUMNS} FROM ops_records WHERE ${where.join(" AND ")} ORDER BY updated_at DESC LIMIT ${limit}`,
@@ -386,7 +419,7 @@ export async function stats(ctx: Ctx) {
 
 export async function listProjects(_ctx: Ctx, status?: string) {
   return await db()`
-    SELECT p.id, p.name, p.kind, p.client_name, p.status, p.area_slug, o.handle AS owner,
+    SELECT p.id, p.name, p.kind, p.client_name, p.crm_company_id, p.status, p.area_slug, o.handle AS owner,
            p.started_on, p.due_on, p.completed_on, p.description, p.updated_at
       FROM ops_projects p LEFT JOIN ops_principals o ON o.id = p.owner_id
      WHERE ${status ?? null}::text IS NULL OR p.status = ${status ?? null}
@@ -397,19 +430,23 @@ export type ProjectInput = {
   id: string; name?: string; kind?: "client_engagement" | "internal"; client_name?: string;
   status?: "planned" | "active" | "on_hold" | "completed" | "cancelled"; area?: string; owner?: string;
   started_on?: string; due_on?: string; completed_on?: string; description?: string;
+  /** CRM company this engagement is for (ID, domain or exact name). */
+  company?: string;
 };
 
 export async function upsertProject(ctx: Ctx, p: ProjectInput) {
   if (ctx.actor.role === "auditor") throw new AccessError("Auditors have read-only access");
   const existing = (await db()`SELECT * FROM ops_projects WHERE id = ${p.id}`)[0];
   const ownerId = await handleToId(p.owner, "owner");
+  const companyId = await resolveCompanyId(p.company);
+  const clientName = p.client_name ?? (companyId ? (await db()`SELECT name FROM crm_companies WHERE id = ${companyId}`)[0].name : null);
   if (!existing) {
     if (!p.name) throw new InputError("name is required for a new project");
     await db()`
-      INSERT INTO ops_projects (id, name, kind, client_name, status, area_slug, owner_id, started_on, due_on, description, created_by)
-      VALUES (${p.id}, ${p.name}, ${p.kind ?? "internal"}, ${p.client_name ?? null}, ${p.status ?? "active"},
+      INSERT INTO ops_projects (id, name, kind, client_name, status, area_slug, owner_id, started_on, due_on, description, created_by, crm_company_id)
+      VALUES (${p.id}, ${p.name}, ${p.kind ?? (companyId ? "client_engagement" : "internal")}, ${clientName}, ${p.status ?? "active"},
               ${p.area ?? null}, ${ownerId ?? ctx.actor.id}, ${p.started_on ?? null}, ${p.due_on ?? null},
-              ${p.description ?? null}, ${ctx.actor.id})`;
+              ${p.description ?? null}, ${ctx.actor.id}, ${companyId})`;
     return { id: p.id, created: true };
   }
   if (!isManager(ctx) && existing.owner_id !== ctx.actor.id) {
@@ -418,7 +455,8 @@ export async function upsertProject(ctx: Ctx, p: ProjectInput) {
   await db()`
     UPDATE ops_projects SET
       name = coalesce(${p.name ?? null}, name), kind = coalesce(${p.kind ?? null}, kind),
-      client_name = coalesce(${p.client_name ?? null}, client_name), status = coalesce(${p.status ?? null}, status),
+      client_name = coalesce(${clientName}, client_name), status = coalesce(${p.status ?? null}, status),
+      crm_company_id = coalesce(${companyId}::uuid, crm_company_id),
       area_slug = coalesce(${p.area ?? null}, area_slug), owner_id = coalesce(${ownerId}, owner_id),
       started_on = coalesce(${p.started_on ?? null}::date, started_on), due_on = coalesce(${p.due_on ?? null}::date, due_on),
       completed_on = CASE WHEN ${p.status ?? null} IN ('completed','cancelled') THEN coalesce(${p.completed_on ?? null}::date, current_date)

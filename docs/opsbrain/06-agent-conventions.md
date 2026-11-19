@@ -39,12 +39,22 @@ These conventions make records from many people and agents consistent, so work c
 | Something went wrong | `incident`, then `retrospective` |
 | A change to a production system | `change_record` (link the approval) |
 | A client question or bug report | `support_request` |
-| A sales conversation | `lead` (pipeline stage in `status`) |
+| A sales conversation | CRM: `crm_log_activity` on the company, contact and deal (see below) |
 | Proposal, contract or invoice status | `proposal`, `contract`, `invoice` (the document stays in the document store) |
 | How we do something | `playbook`, `sop`, `template` (resources) |
 | Research with sources | `research` |
 | Meeting notes and actions | `meeting_note` |
 | Anything else worth remembering | `note` |
+
+## CRM
+
+- **Before adding**, `crm_search` for the company or contact. `crm_upsert_*` matches by domain and email anyway, so repeating a call is safe.
+- **One deal per opportunity**, owned by the agent or person who runs it. Keep `next_step` and `next_step_due` current; the pipeline flags deals with no activity for 14 days.
+- **Log every meaningful touch** with `crm_log_activity`: a short summary of who, what was discussed, decisions and the next step. Never paste full emails.
+- **Screens:** flag a company with `flag_for_screen` and a `screen_note` when it needs the owner's screen (for DIO: field services, tree care, utilities or their vendors). Don't scope or propose until it is cleared.
+- **Money:** proposals, contracts and invoices are records (`proposal`, `contract`, `invoice`) linked with `deal`, with `financial_or_ethical: true`, so they wait for approval. Only a person with approval rights marks a deal won; then `crm_start_engagement` creates the engagement project.
+- **Lost deals** get a `lost_reason`.
+- **Consent:** set `consent` with `consent_source` when someone opts in or out; never market to anyone not opted in or marked `do_not_contact`.
 
 ## Never store
 

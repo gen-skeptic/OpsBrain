@@ -191,7 +191,13 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 
 See [Connect clients](02-connect-clients.md). Then ask your client: "Call whoami on OpsBrain." It should answer with your handle and role.
 
-## Step 10. Back up
+## Step 10. Open the web UI
+
+People use the CRM and the approval queue in the browser at `<OPSBRAIN_PUBLIC_URL>/crm` (or `http://127.0.0.1:8787/crm` on the server). Sign in with your own key from Step 7; only people can sign in, agents can't. To sign in through your SSO instead (Authentik, oauth2-proxy), set `OPSBRAIN_UI_AUTH=both`, `OPSBRAIN_UI_PROXY_SECRET` and your proxy as described in [CRM: Sign in](07-crm.md#sign-in). Set `OPSBRAIN_UI_ENABLED=false` to turn the UI off.
+
+To use your own sales stages, add `pipeline_stages` to the seed file and seed again ([CRM: The pipeline](07-crm.md#the-pipeline)).
+
+## Step 11. Back up
 
 OpsBrain is the company's system of record. Back it up before you rely on it.
 

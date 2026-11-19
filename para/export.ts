@@ -11,6 +11,7 @@ import {
   type ExportRecord, type HistoryEntry, type LinkEntry, MARKER, placeRecord, type ProjectInfo, projectFolder,
   recordPath, renderAreaIndex, renderProjectIndex, renderRecord, renderRootIndex, ROOTS, safeName,
 } from "./para.ts";
+import { companyPath, type CrmContext, dealPath, pipelinePath, contactsPath, renderCompany, renderContacts, renderDeal, renderPipeline } from "./crm.ts";
 
 export type ExportOptions = {
   outputDir: string;
@@ -18,6 +19,10 @@ export type ExportOptions = {
   archiveAfterDays: number;
   title: string;
   now?: Date;
+  /** Folder for CRM pages under 2-Areas (default "CRM"). */
+  crmFolder?: string;
+  /** Include contact emails and phone numbers in the mirror (default false). */
+  crmContactDetails?: boolean;
 };
 
 export type ExportResult = { written: number; unchanged: number; removed: number; total: number };
@@ -48,6 +53,11 @@ export async function exportPara(o: ExportOptions): Promise<ExportResult> {
   const now = o.now ?? new Date();
   const root = o.outputDir.replace(/\/$/, "");
   const records = (await sql`SELECT * FROM ops_records WHERE visibility = ${o.visibility} ORDER BY created_at`) as unknown as ExportRecord[];
+  const crmFolder = o.crmFolder ?? "CRM";
+  // Records about CRM companies (activities, proposals...) without a project or area live with the CRM.
+  for (const r of records as unknown as Record<string, unknown>[]) {
+    if (!r.area_name && !r.project_id && r.crm_company_id) r.area_name = crmFolder;
+  }
   const projects = (await sql`
     SELECT p.*, o.handle AS owner FROM ops_projects p LEFT JOIN ops_principals o ON o.id = p.owner_id ORDER BY p.id`) as unknown as ProjectInfo[];
   const ids = records.map((r) => r.id);
@@ -109,9 +119,35 @@ export async function exportPara(o: ExportOptions): Promise<ExportResult> {
     files.set(indexPath, renderAreaIndex(folder, recs, indexPath));
     return { folder, count: recs.length };
   });
+  // CRM pages (company mirror only; CRM entries are company-visible).
+  let crm: { pipeline: string; openDeals: number } | undefined;
+  if (o.visibility === "company") {
+    const companies = await sql`SELECT c.*, o.handle AS owner FROM crm_companies c LEFT JOIN ops_principals o ON o.id = c.owner_id ORDER BY lower(c.name)`;
+    if (companies.length) {
+      const contacts = await sql`SELECT * FROM crm_contacts ORDER BY lower(full_name)`;
+      const deals = await sql`SELECT * FROM crm_deals_view ORDER BY stage_order, updated_at DESC`;
+      const stages = await sql`
+        SELECT * FROM crm_pipeline_stages s
+         WHERE active OR EXISTS (SELECT 1 FROM crm_deals d WHERE d.stage = s.slug AND d.archived_at IS NULL)
+         ORDER BY sort_order`;
+      const x: CrmContext = { folder: crmFolder, now, archiveAfterDays: o.archiveAfterDays, contactDetails: o.crmContactDetails ?? false, recordPath: (id) => pathOf.get(id) };
+      const byId = new Map(companies.map((c) => [c.id as string, c]));
+      const linked = (key: string, id: string) =>
+        (records as unknown as Record<string, unknown>[]).filter((r) => r[key] === id)
+          .sort((a, b) => +new Date(String((b.fields as Record<string, unknown>)?.occurred_at ?? b.created_at)) - +new Date(String((a.fields as Record<string, unknown>)?.occurred_at ?? a.created_at)));
+      for (const c of companies) {
+        files.set(companyPath(c, x), renderCompany(c, contacts.filter((p) => p.company_id === c.id), deals.filter((d) => d.company_id === c.id), linked("crm_company_id", c.id), x));
+      }
+      for (const d of deals) files.set(dealPath(d, x), renderDeal(d, byId.get(d.company_id), linked("crm_deal_id", d.id), x));
+      files.set(pipelinePath(x), renderPipeline(stages, deals, byId, x));
+      files.set(contactsPath(x), renderContacts(contacts, byId, x));
+      crm = { pipeline: pipelinePath(x), openDeals: deals.filter((d) => !d.is_won && !d.is_lost && !d.archived_at).length };
+    }
+  }
+
   const pending = records.filter((r) => r.requires_approval && r.approval_status === "pending").map((r) => ({ path: pathOf.get(r.id)!, r }));
   const recent = [...records].sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at)).slice(0, 25).map((r) => ({ path: pathOf.get(r.id)!, r }));
-  files.set("README.md", renderRootIndex({ title: o.title, exportedAt: now, projects: projectEntries, areas: areaEntries, pending, recent, total: records.length }));
+  files.set("README.md", renderRootIndex({ title: o.title, exportedAt: now, projects: projectEntries, areas: areaEntries, pending, recent, total: records.length, crm }));
 
   // Write only what changed; remove files this exporter generated before but no longer produces.
   await Deno.mkdir(`${root}/.opsbrain`, { recursive: true });
@@ -167,11 +203,13 @@ export async function runConfiguredExport(): Promise<void> {
   const title = env("PARA_TITLE", "OpsBrain");
   const out = env("PARA_OUTPUT_DIR", "./para-output");
   const started = Date.now();
-  const main = await exportPara({ outputDir: out, visibility: "company", archiveAfterDays, title });
+  const crmFolder = env("PARA_CRM_FOLDER", "CRM");
+  const crmContactDetails = ["1", "true", "yes"].includes(env("PARA_CRM_CONTACT_DETAILS", "false").toLowerCase());
+  const main = await exportPara({ outputDir: out, visibility: "company", archiveAfterDays, title, crmFolder, crmContactDetails });
   console.log(`PARA export to ${out}: ${main.total} records, ${main.written} written, ${main.unchanged} unchanged, ${main.removed} removed (${Date.now() - started} ms)`);
   const restricted = Deno.env.get("PARA_RESTRICTED_DIR");
   if (restricted) {
-    const r = await exportPara({ outputDir: restricted, visibility: "restricted", archiveAfterDays, title: `${title} (restricted)` });
+    const r = await exportPara({ outputDir: restricted, visibility: "restricted", archiveAfterDays, title: `${title} (restricted)`, crmFolder });
     console.log(`Restricted export to ${restricted}: ${r.total} records, ${r.written} written, ${r.removed} removed`);
   }
   const commit = ["1", "true", "yes"].includes((Deno.env.get("PARA_GIT_COMMIT") ?? "").toLowerCase());

@@ -45,6 +45,10 @@ para-output/
     └── Resources/                     archived resources
 ```
 
+## CRM pages
+
+The CRM gets its own folder, `2-Areas/CRM/` (`PARA_CRM_FOLDER`): `Pipeline.md`, `Contacts.md`, one page per company and per deal, and the activity and other records linked to a CRM company that have no project or area. Disqualified or archived companies, archived deals and deals closed more than `PARA_ARCHIVE_AFTER_DAYS` ago move to `4-Archive/CRM/`. Contact emails and phone numbers stay out of the files unless `PARA_CRM_CONTACT_DETAILS=true`. The front page links to the pipeline. See [CRM: In the PARA mirror](07-crm.md#in-the-para-mirror).
+
 ## Where a record goes
 
 The first rule that matches wins:

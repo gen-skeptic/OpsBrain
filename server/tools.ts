@@ -2,46 +2,14 @@
 // named in `acting_as` when that principal is allowed to act for it.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { AccessError, type Principal, resolveCtx } from "./auth.ts";
+import type { Principal } from "./auth.ts";
+import { actingAs, ok, PRIVACY, ro, run, rw } from "./tool_helpers.ts";
+import { registerCrmTools } from "./crm_tools.ts";
 import * as rec from "./records.ts";
 import { config } from "./config.ts";
 
 const RECORD_TYPES_HINT =
-  "note, task_card, qa_record, decision, approval, kaizen_card, meeting_note, risk, incident, change_record, support_request, lead, proposal, invoice, contract, hiring, feedback, report, plan, retrospective, playbook, sop, template, research, reference, policy";
-
-const PRIVACY =
-  " Never store client confidential data (client systems, customer records, credentials, health or financial data) or client deliverables in OpsBrain; store company records about the work, and link to deliverables in the client's own systems.";
-
-const actingAs = z.string().optional().describe(
-  "Handle of the agent you are acting as (e.g. dio-chief-of-staff). Required when one key is shared by several agents in a session; must be delegated to your key.",
-);
-
-type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
-
-function ok(value: unknown, summary?: string): Result {
-  const text = (summary ? summary + "\n\n" : "") + JSON.stringify(value, null, 2);
-  return { content: [{ type: "text", text }] };
-}
-
-function fail(err: unknown): Result {
-  const e = err as Error & { code?: string };
-  let msg = e.message ?? String(err);
-  if (e.code === "23503") msg = `A referenced project, area, process, record type or principal does not exist (${msg})`;
-  if (e.code === "23505") msg = `That value must be unique (${msg})`;
-  const kind = err instanceof AccessError ? "Not allowed" : err instanceof rec.InputError ? "Invalid input" : "Error";
-  return { content: [{ type: "text", text: `${kind}: ${msg}` }], isError: true };
-}
-
-function run<A extends { acting_as?: string }>(auth: Principal, fn: (ctx: Awaited<ReturnType<typeof resolveCtx>>, args: A) => Promise<Result>) {
-  return async (args: A): Promise<Result> => {
-    try {
-      const ctx = await resolveCtx(auth, args.acting_as);
-      return await fn(ctx, args);
-    } catch (err) {
-      return fail(err);
-    }
-  };
-}
+  "note, task_card, qa_record, decision, approval, kaizen_card, meeting_note, risk, incident, change_record, support_request, lead, proposal, invoice, contract, hiring, feedback, report, plan, retrospective, playbook, sop, template, research, reference, policy, activity (prefer crm_log_activity)";
 
 const recordFields = {
   title: z.string().max(300).optional().describe("Short title"),
@@ -63,6 +31,9 @@ const recordFields = {
   allowed: z.array(z.string()).optional().describe("Extra handles that may read a restricted record"),
   financial_or_ethical: z.boolean().optional().describe("True when the record carries a financial or ethical consideration; it then needs approval from a person with approval rights"),
   requires_approval: z.boolean().optional(),
+  company: z.string().optional().describe("CRM company this record is about: ID, domain or exact name"),
+  contact: z.string().optional().describe("CRM contact: ID, email or exact name"),
+  deal: z.string().optional().describe("CRM deal: ID or exact name (links proposals, contracts and invoice records to the pipeline)"),
 };
 
 const listFilters = {
@@ -79,12 +50,13 @@ const listFilters = {
   updated_since: z.string().optional().describe("ISO date or timestamp"),
   include_archived: z.boolean().optional(),
   limit: z.number().int().optional(),
+  company: z.string().optional().describe("Only records linked to this CRM company (ID, domain or name)"),
+  contact: z.string().optional().describe("Only records linked to this CRM contact (ID, email or name)"),
+  deal: z.string().optional().describe("Only records linked to this CRM deal (ID or name)"),
 };
 
 export function buildServer(auth: Principal): McpServer {
-  const server = new McpServer({ name: "opsbrain", version: "1.0.0" });
-  const ro = { readOnlyHint: true };
-  const rw = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+  const server = new McpServer({ name: "opsbrain", version: "1.1.0" });
 
   server.registerTool("whoami", {
     title: "Who am I",
@@ -207,6 +179,7 @@ export function buildServer(auth: Principal): McpServer {
       area: z.string().optional(), owner: z.string().optional(),
       started_on: z.string().optional(), due_on: z.string().optional(), completed_on: z.string().optional(),
       description: z.string().optional(),
+      company: z.string().optional().describe("CRM company the engagement is for (ID, domain or exact name); fills client_name"),
       acting_as: actingAs,
     },
   }, run(auth, async (ctx, a: any) => ok(await rec.upsertProject(ctx, a))));
@@ -228,6 +201,8 @@ export function buildServer(auth: Principal): McpServer {
     description: "Record counts by type, pending approvals and projects by status (only what you can read).",
     annotations: ro, inputSchema: { acting_as: actingAs },
   }, run(auth, async (ctx) => ok(await rec.stats(ctx))));
+
+  registerCrmTools(server, auth);
 
   // ---- Open Brain compatibility (existing clients and skills keep working) ----
   server.registerTool("capture_thought", {

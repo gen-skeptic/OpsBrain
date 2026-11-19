@@ -211,6 +211,7 @@ export function renderRootIndex(opts: {
   title: string; exportedAt: Date; projects: { folder: string; p: ProjectInfo; count: number }[];
   areas: { folder: string; count: number }[]; pending: { path: string; r: ExportRecord }[];
   recent: { path: string; r: ExportRecord }[]; total: number;
+  crm?: { pipeline: string; openDeals: number };
 }): string {
   const l = [
     `# ${opts.title}`, "", MARKER, "",
@@ -224,6 +225,7 @@ export function renderRootIndex(opts: {
   l.push("", "## Areas", "");
   if (opts.areas.length) for (const a of opts.areas) l.push(`- [${a.folder}](${encodeURI(`${ROOTS.area}/${a.folder}/_index.md`)}) · ${a.count} records`);
   else l.push("None.");
+  if (opts.crm) l.push("", "## Sales", "", `- [Pipeline](${encodeURI(opts.crm.pipeline)}) · ${opts.crm.openDeals} open deals`);
   l.push("", `## Waiting for approval (${opts.pending.length})`, "");
   if (opts.pending.length) for (const { path, r } of opts.pending) l.push(`- [${r.title ?? r.record_type_name}](${encodeURI(path)}) · ${r.record_type_name} · owner ${r.owner ?? "none"}`);
   else l.push("Nothing waiting.");

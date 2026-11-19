@@ -22,6 +22,8 @@ OpsBrain holds how the company runs. It is private by design: it runs on servers
 | Write permission | Only owners and admins, or the record's owner, assignee, creator or allowed principals can change a record. Anyone who can read it can comment. |
 | Decision rights | Approval of financial or ethical records is enforced by a database trigger: only an active human with `can_approve`. |
 | Audit trail | Every change is an event with actor, key holder and changed fields. Events are append-only through the tools. |
+| CRM decisions | Clearing or declining a company screen and marking a deal won need an active human with `can_approve`, enforced by database triggers. |
+| Web UI | People only. Sign-in with your own key or through an SSO proxy that also presents `OPSBRAIN_UI_PROXY_SECRET`. Sessions are random IDs stored hashed, in HttpOnly SameSite=Strict cookies (Secure over HTTPS) that expire after `OPSBRAIN_UI_SESSION_HOURS`. Every form needs the session's CSRF token and must come from the same origin. Pages are sent with a strict Content Security Policy (no scripts at all), `X-Frame-Options: DENY` and `no-store` caching, and every value is HTML-escaped. |
 
 ## Network
 
@@ -29,7 +31,8 @@ OpsBrain holds how the company runs. It is private by design: it runs on servers
 - The database port is not published at all.
 - Prefer a VPN for team access. Use a public tunnel only for clients that require it (Claude Desktop and claude.ai custom connectors), with a dedicated, revocable key.
 - Set `OPSBRAIN_ALLOW_QUERY_KEY=false` if no client needs `?key=`, so keys never appear in URLs or proxy logs.
-- The server accepts only `POST` for MCP; `GET` returns 405.
+- The server accepts only `POST` for MCP; `GET` returns 405 except for the web UI pages (`/login`, `/crm`, `/approvals`, `/records`, `/assets`).
+- If you put SSO in front of the UI, keep the proxy secret long and random, make the proxy strip the user header from incoming requests, and don't publish the server port anywhere the proxy can be bypassed.
 
 ## Keys
 
@@ -44,6 +47,10 @@ OpsBrain holds how the company runs. It is private by design: it runs on servers
 - Encrypt disks on the database host and wherever the PARA mirror is synced.
 - Keep the restricted mirror folder `chmod 700`, owned by the exporter, and out of shared sync.
 - If you version the mirror with git, push only to a private remote on a server you control.
+
+## CRM personal data
+
+The CRM holds business contact details (name, role, work email and phone, consent). Keep it to that: no personal addresses, no notes about people's private lives, no candidates (they go in restricted hiring records), and activities as summaries rather than email bodies. Record marketing consent with its source and honor do-not-contact. Contact emails and phones are left out of the PARA mirror by default. To handle a deletion request, see [CRM: Privacy](07-crm.md#privacy).
 
 ## Retention
 
