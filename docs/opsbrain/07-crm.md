@@ -21,7 +21,7 @@ Any record can link to the CRM with `company`, `contact` and `deal` on `create_r
 
 | Rule | Enforced by |
 | --- | --- |
-| **Screens.** Anyone can flag a company for a screen (for DIO: the employer-boundary screen for field-services, tree-care or utility-adjacent prospects). While a screen is pending or declined, its deals cannot move into stages marked `gate_screen` (by default Meeting and later). Only an active person with approval rights can clear or decline a screen; declining also marks the company disqualified. | Database trigger |
+| **Screens.** Anyone can flag a company for a screen, such as a conflict-of-interest check; your own operating manual defines which prospects need one. While a screen is pending or declined, its deals cannot move into stages marked `gate_screen` (by default Meeting and later). Only an active person with approval rights can clear or decline a screen; declining also marks the company disqualified. | Database trigger |
 | **Won deals.** Marking a deal won is a financial decision: only an active person with approval rights can do it, with their own key (never acting as an agent). Agents prepare the proposal and contract records for approval instead. | Database trigger, and the server |
 | **Lost deals** need a lost reason, which feeds the win/loss review. | Server |
 | **Lifecycle** follows the deals: a company with an open deal becomes an opportunity, and a won deal makes it a client. | Server |

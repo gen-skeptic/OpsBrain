@@ -117,7 +117,7 @@ ${textarea("Notes", "notes", c.notes, { help: "Log conversations as activities i
 
 export function companyNewBody(v: View): Html {
   return html`${heading("New company")}<div class="panel">${form("/crm/companies", v.csrf, html`${companyFields(v)}
-${checkbox("Needs a screen before we pursue it", "flag_for_screen", false, "For example field services, tree care or anything utility-adjacent: the owner decides before the deal can be scoped.")}
+${checkbox("Needs a screen before we pursue it", "flag_for_screen", false, "For example a possible conflict of interest: a person with approval rights decides before the deal can be scoped.")}
 ${field("Why it needs a screen", "screen_note", "", { full: true })}`, "Create company")}</div>`;
 }
 

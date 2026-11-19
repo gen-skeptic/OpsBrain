@@ -51,7 +51,7 @@ These conventions make records from many people and agents consistent, so work c
 - **Before adding**, `crm_search` for the company or contact. `crm_upsert_*` matches by domain and email anyway, so repeating a call is safe.
 - **One deal per opportunity**, owned by the agent or person who runs it. Keep `next_step` and `next_step_due` current; the pipeline flags deals with no activity for 14 days.
 - **Log every meaningful touch** with `crm_log_activity`: a short summary of who, what was discussed, decisions and the next step. Never paste full emails.
-- **Screens:** flag a company with `flag_for_screen` and a `screen_note` when it needs the owner's screen (for DIO: field services, tree care, utilities or their vendors). Don't scope or propose until it is cleared.
+- **Screens:** flag a company with `flag_for_screen` and a `screen_note` when it needs the owner's screen (a conflict-of-interest check; your operating manual says which prospects need one). Don't scope or propose until it is cleared.
 - **Money:** proposals, contracts and invoices are records (`proposal`, `contract`, `invoice`) linked with `deal`, with `financial_or_ethical: true`, so they wait for approval. Only a person with approval rights marks a deal won; then `crm_start_engagement` creates the engagement project.
 - **Lost deals** get a `lost_reason`.
 - **Consent:** set `consent` with `consent_source` when someone opts in or out; never market to anyone not opted in or marked `do_not_contact`.

@@ -175,7 +175,7 @@ export async function upsertCompany(ctx: Ctx, input: CompanyInput) {
   }
 }
 
-/** Clear or decline a company's screen (for example the employer-boundary screen). People with approval rights only. */
+/** Clear or decline a company's screen (for example a conflict-of-interest check). People with approval rights only. */
 export async function screenCompany(ctx: Ctx, ref: string, decision: "cleared" | "declined" | "not_needed", note?: string) {
   if (!isApprover(ctx)) throw new AccessError("Screens are decided by a person with approval rights, using their own key (not acting as an agent)");
   const id = await resolveCompanyId(ref);

@@ -24,7 +24,7 @@ export function registerCrmTools(server: McpServer, auth: Principal) {
   server.registerTool("crm_upsert_company", {
     title: "Create or update CRM company",
     description:
-      `Create or update a company in the CRM. Matches an existing company by id, then domain, then exact name, so repeating a call updates instead of duplicating. Set flag_for_screen when a prospect needs the owner's screen (for example the employer-boundary screen); deals then cannot pass the screened stages until a person with approval rights clears it.${CRM_PRIVACY}`,
+      `Create or update a company in the CRM. Matches an existing company by id, then domain, then exact name, so repeating a call updates instead of duplicating. Set flag_for_screen when a prospect needs the owner's screen (for example a conflict-of-interest check); deals then cannot pass the screened stages until a person with approval rights clears it.${CRM_PRIVACY}`,
     annotations: { ...rw, idempotentHint: true },
     inputSchema: {
       id: z.string().optional().describe("Company ID, domain or exact name of an existing company"),
@@ -46,7 +46,7 @@ export function registerCrmTools(server: McpServer, auth: Principal) {
 
   server.registerTool("crm_screen_company", {
     title: "Decide a company screen",
-    description: "Clear or decline a company's screen (for example the employer-boundary screen). Only a person with approval rights, using their own key, can do this; declining also marks the company disqualified.",
+    description: "Clear or decline a company's screen (for example a conflict-of-interest check). Only a person with approval rights, using their own key, can do this; declining also marks the company disqualified.",
     annotations: { ...rw, idempotentHint: true },
     inputSchema: {
       company: z.string().describe("Company ID, domain or exact name"),
