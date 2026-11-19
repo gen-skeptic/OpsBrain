@@ -172,6 +172,18 @@ Deno.test({ name: "OpsBrain end to end", ignore, sanitizeOps: false, sanitizeRes
       const edited = await call(keys.erich, "update_record", { id: decisionId, content: "Offer 15% off the build." });
       assertEquals(edited.data.approval_status, "pending");
       await call(keys.erich, "decide_approval", { id: decisionId, decision: "approve" });
+      // Changing structured fields (where amounts live) also reopens it.
+      const amount = await call(keys["dio-a"], "update_record", { id: decisionId, fields: { discount_percent: 20 } });
+      assertEquals(amount.data.approval_status, "pending");
+      // A status-only change does not.
+      await call(keys.erich, "decide_approval", { id: decisionId, decision: "approve" });
+      const statusOnly = await call(keys["dio-a"], "update_record", { id: decisionId, status: "decided" });
+      assertEquals(statusOnly.data.approval_status, "approved");
+      // Editing after "changes requested" resubmits for approval.
+      await call(keys.erich, "decide_approval", { id: decisionId, decision: "request_changes", comment: "Cap it at 10%" });
+      const resubmitted = await call(keys["dio-a"], "update_record", { id: decisionId, fields: { discount_percent: 10 } });
+      assertEquals(resubmitted.data.approval_status, "pending");
+      await call(keys.erich, "decide_approval", { id: decisionId, decision: "approve" });
     });
 
     await t.step("search, links, history and compatibility tools", async () => {

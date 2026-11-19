@@ -256,9 +256,12 @@ BEGIN
     END IF;
     NEW.approved_at := now();
   END IF;
-  IF TG_OP = 'UPDATE' AND OLD.approval_status = 'approved'
-     AND NEW.approval_status = 'approved' AND NEW.content IS DISTINCT FROM OLD.content THEN
-    -- Changing approved content reopens the approval.
+  IF TG_OP = 'UPDATE' AND OLD.approval_status IN ('approved', 'changes_requested')
+     AND NEW.approval_status IS NOT DISTINCT FROM OLD.approval_status
+     AND (NEW.content IS DISTINCT FROM OLD.content
+          OR NEW.title IS DISTINCT FROM OLD.title
+          OR NEW.fields IS DISTINCT FROM OLD.fields) THEN
+    -- Changing what was approved reopens the approval; editing after "changes requested" resubmits it.
     NEW.approval_status := 'pending';
     NEW.approved_by := NULL;
     NEW.approved_at := NULL;

@@ -84,7 +84,7 @@ These rules hold no matter which client or agent writes the record:
 
 1. A record marked `financial_or_ethical` always requires approval, and starts as `pending`.
 2. Only an active human with `can_approve` can set `approved` or `rejected`. Anyone else, including direct SQL, gets `insufficient_privilege`.
-3. Changing the title or content of an approved record sends it back to `pending`.
+3. Changing the title, content or `fields` of an approved record sends it back to `pending`. Editing a record after the approver requested changes resubmits it (`pending`). Status-only changes keep the approval.
 4. Only a person with approval rights can clear the `financial_or_ethical` or `requires_approval` flags.
 5. Approvals go through `decide_approval`, with the person's own key and without `acting_as`.
 
