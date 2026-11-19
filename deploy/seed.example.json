@@ -1,0 +1,23 @@
+{
+  "areas": [
+    { "slug": "leadership", "name": "Leadership and strategy", "sort_order": 1, "owner": "owner" },
+    { "slug": "service-delivery", "name": "Service delivery", "sort_order": 2, "owner": "owner" },
+    { "slug": "finance", "name": "Finance and administration", "sort_order": 3, "owner": "owner" }
+  ],
+  "principals": [
+    { "handle": "owner", "display_name": "Company Owner", "kind": "human", "role": "owner", "can_approve": true, "job_title": "Founder" },
+    { "handle": "ops-orchestrator", "display_name": "Operations Orchestrator", "kind": "agent", "role": "agent", "responsible": "owner", "job_title": "Routes work between agents" },
+    { "handle": "qa-reviewer", "display_name": "Quality Reviewer", "kind": "agent", "role": "agent", "responsible": "owner", "job_title": "Independent QA" },
+    { "handle": "owner-claude-code", "display_name": "Owner's Claude Code session", "kind": "service", "role": "agent", "responsible": "owner" }
+  ],
+  "processes": [
+    { "id": "P01", "name": "Client intake to signed proposal", "area": "service-delivery", "owner": "ops-orchestrator" },
+    { "id": "P02", "name": "Monthly close", "area": "finance", "owner": "owner" }
+  ],
+  "delegations": [
+    { "principal": "owner-claude-code", "may_act_as": "all-agents" }
+  ],
+  "projects": [
+    { "id": "INT-001", "name": "Stand up OpsBrain", "kind": "internal", "area": "leadership", "owner": "owner" }
+  ]
+}

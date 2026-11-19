@@ -1,0 +1,24 @@
+# OPTIONAL example: Postgres with pgvector via the CloudNativePG operator (install the operator first).
+# Not in kustomization.yaml on purpose; apply it once:  kubectl apply -n opsbrain -f deploy/k8s/postgres-cnpg.yaml
+# CNPG creates the secret opsbrain-db-app with a "uri" key; point DATABASE_URL at it, for example by
+# replacing the secretRef in deployment.yaml and para-cronjob.yaml with:
+#   env: [{ name: DATABASE_URL, valueFrom: { secretKeyRef: { name: opsbrain-db-app, key: uri } } }]
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: opsbrain-db
+spec:
+  instances: 2
+  # CloudNativePG's standard PostgreSQL images ship pgvector. If you use another image, make sure it does.
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  storage:
+    size: 20Gi
+  bootstrap:
+    initdb:
+      database: opsbrain
+      owner: opsbrain
+      postInitApplicationSQL:
+        # The app user is not a superuser, so create the extensions here.
+        - CREATE EXTENSION IF NOT EXISTS vector
+        - CREATE EXTENSION IF NOT EXISTS pgcrypto
+  # Add backups to storage you control (CNPG Barman Cloud plugin or barmanObjectStore) before go-live.

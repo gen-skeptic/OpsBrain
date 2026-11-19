@@ -1,0 +1,9 @@
+# ClusterIP only. Expose it through your ingress or tunnel with TLS and, ideally, SSO or a VPN in front.
+apiVersion: v1
+kind: Service
+metadata:
+  name: opsbrain
+spec:
+  selector: { app: opsbrain }
+  ports:
+    - { name: http, port: 80, targetPort: http }

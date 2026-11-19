@@ -1,0 +1,95 @@
+# OpsBrain on one server: Postgres + pgvector, the MCP server, and the PARA exporter.
+#   cp deploy/.env.example deploy/.env    # then edit it
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+# Add local embeddings (recommended, keeps everything on your hardware):
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env --profile local-ai up -d --build
+name: opsbrain
+
+x-opsbrain-env: &opsbrain-env
+  DATABASE_URL: postgres://${POSTGRES_USER:-opsbrain}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/${POSTGRES_DB:-opsbrain}
+  OPSBRAIN_PUBLIC_URL: ${OPSBRAIN_PUBLIC_URL:-http://localhost:8787}
+  OPSBRAIN_ALLOW_QUERY_KEY: ${OPSBRAIN_ALLOW_QUERY_KEY:-true}
+  OPSBRAIN_MAX_RECORD_CHARS: ${OPSBRAIN_MAX_RECORD_CHARS:-50000}
+  EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+  EMBEDDING_API_BASE: ${EMBEDDING_API_BASE:-http://ollama:11434/v1}
+  EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+  METADATA_EXTRACTION: ${METADATA_EXTRACTION:-false}
+  LLM_API_BASE: ${LLM_API_BASE:-http://ollama:11434/v1}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_MODEL: ${LLM_MODEL:-llama3.1:8b}
+  TZ: ${TZ:-America/New_York}
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opsbrain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-opsbrain}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-opsbrain} -d ${POSTGRES_DB:-opsbrain}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # No ports published: only the OpsBrain containers reach the database.
+
+  opsbrain:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    image: opsbrain:local
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      <<: *opsbrain-env
+    # Bound to localhost. Publish it through your reverse proxy, VPN or tunnel with TLS, never directly.
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  para-export:
+    image: opsbrain:local
+    restart: unless-stopped
+    depends_on:
+      opsbrain: { condition: service_healthy } # healthy = migrations applied
+    command: ["task", "para:schedule"]
+    healthcheck: { disable: true }
+    environment:
+      <<: *opsbrain-env
+      PARA_OUTPUT_DIR: /data/para
+      PARA_RESTRICTED_DIR: ${PARA_RESTRICTED_DIR:-}
+      PARA_EXPORT_TIMES: ${PARA_EXPORT_TIMES:-00:00,06:00,12:00,18:00}
+      PARA_EXPORT_ON_START: ${PARA_EXPORT_ON_START:-true}
+      PARA_TITLE: ${PARA_TITLE:-OpsBrain}
+      PARA_ARCHIVE_AFTER_DAYS: ${PARA_ARCHIVE_AFTER_DAYS:-30}
+      PARA_GIT_COMMIT: ${PARA_GIT_COMMIT:-false}
+      PARA_GIT_PUSH: ${PARA_GIT_PUSH:-false}
+      PARA_GIT_AUTHOR_NAME: ${PARA_GIT_AUTHOR_NAME:-OpsBrain export}
+      PARA_GIT_AUTHOR_EMAIL: ${PARA_GIT_AUTHOR_EMAIL:-opsbrain@localhost}
+    volumes:
+      # The human-readable mirror lands here on the host. Share it read-only (Obsidian, file share, private git).
+      - ../para-output:/data/para
+      - ../para-restricted:/data/para-restricted
+
+  ollama:
+    image: ollama/ollama:0.12.6
+    profiles: ["local-ai"]
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+
+  ollama-pull:
+    image: ollama/ollama:0.12.6
+    profiles: ["local-ai"]
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "sleep 5 && ollama pull ${EMBEDDING_MODEL:-nomic-embed-text}"]
+    restart: "no"
+
+volumes:
+  pgdata:
+  ollama:

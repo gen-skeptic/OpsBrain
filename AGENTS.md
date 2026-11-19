@@ -1,72 +1,55 @@
-# OB1 Agent Instructions
+# OpsBrain: instructions for AI coding agents
 
-## Parallel Agent Worktrees
+This file is for AI coding tools (Claude Code, Codex, Cursor, OpenClaw, Hermes) working **on this repository**. For how agents should *use* a running OpsBrain, see `docs/opsbrain/06-agent-conventions.md`.
 
-When multiple AI agents or assistant chats work on this repo, do not put them in the same checkout.
+## What this repo is
 
-### Setup pattern
-
-- Treat the main repo checkout as the canonical repo for pulling, inspection, and creating worktrees.
-- Create one Git worktree per active agent, task, or PR-sized workstream.
-- Give each worktree a descriptive folder name and a matching branch name.
-- Start every agent task by naming the exact absolute worktree path it owns.
-- The assigned worktree path is the boundary. The chat is not the boundary.
-
-### Agent assignment template
-
-Start each parallel-agent task with:
+OpsBrain is the private, self-hosted system of record for Dautel Intelligent Operations: a multi-user, multi-agent company database with an MCP server, forked from Open Brain (OB1) by Nate B. Jones. License: FSL-1.1-MIT (internal use and professional services allowed; no competing commercial product or service). Keep the license and notices intact.
 
 ```text
-Repository worktree:
-/ABSOLUTE/PATH/TO/PROJECT-WORKTREE
-
-Branch:
-codex/SHORT-TASK-NAME
-
-Task:
-DESCRIBE THE EXACT WORK.
+server/          Deno MCP server (Hono + MCP SDK, Streamable HTTP, stateless): config, db, auth, records, tools, app
+db/migrations/   SQL migrations, applied once each by db/migrate.ts ({{EMBEDDING_DIM}} is substituted)
+admin/           opsbrain-admin CLI (principals, keys, delegations, areas, projects, seed, reembed)
+para/            PARA markdown exporter (para.ts pure logic, export.ts I/O) and scheduler
+deploy/          Dockerfile, docker-compose.yml, .env.example, seed.example.json, k8s/
+tests/           para_test.ts (unit), integration_test.ts (end to end, needs OPSBRAIN_TEST_ADMIN_URL)
+docs/opsbrain/   OpsBrain documentation (keep it in step with the code)
 ```
 
-### Rules
+Everything else (`extensions/`, `recipes/`, `schemas/`, `dashboards/`, `integrations/`, `skills/`, `primitives/`, `resources/`, older `docs/`) is the upstream Open Brain community library, kept for reference. Do not change it as part of OpsBrain work.
 
-- Do not switch branches in the canonical repo while another agent may be working.
-- Do not edit sibling worktrees unless explicitly asked.
-- Before staging or committing, run `git status --short` and stage only files that belong to the current task.
-- If `main` or another branch changed underneath the worktree, pause before merging or rebasing unless the task explicitly says to finish the PR end to end.
-- After a branch is merged and the worktree is clean, remove the finished worktree with `git worktree remove /ABSOLUTE/PATH/TO/PROJECT-WORKTREE`.
+## Commands
 
-### Quick checks
+```bash
+deno task check
+```
 
-- If another chat suddenly changed branches, both chats were probably in the same working directory.
-- If `git worktree add` says a branch is already checked out, create a new branch name or remove the old clean worktree.
-- If cleanup fails, inspect `git status --short` and preserve uncommitted work.
+```bash
+OPSBRAIN_TEST_ADMIN_URL=postgres://postgres:postgres@localhost:5432/postgres deno task test
+```
 
-## Required Step: Update Linear
+Run both before every commit that touches `server/`, `db/`, `admin/`, `para/` or `tests/`. Add or update tests with every behavior change.
 
-- For feature work tied to a Linear issue, update Linear at the start of the work, at meaningful checkpoints, and before handing back to the user.
-- Use the parent issue as the living implementation log and keep child issues aligned with the files and behavior being changed.
-- For the OB1 Agent Memory / OpenClaw launch work, the parent issue is `NAT-833`. Record architecture notes, implementation milestones, blockers, and verification results there.
-- Do not wait until the end to document decisions. If a decision changes schema, API contract, trust policy, user-facing workflow, or publishing path, capture it in Linear while it is still fresh.
+## Guard rails
 
-## Agent Memory Product Guardrails
+- **Privacy first.** OpsBrain runs only on servers we control. Never add code that sends records to a third-party service by default (hosted embeddings, analytics, telemetry, error trackers). Local embeddings are the default.
+- **Clients never see OpsBrain.** No client-facing endpoints, exports or logins.
+- **No client deliverables or client confidential data** in OpsBrain, in seed data, examples or tests.
+- **Never alter or drop Open Brain's original `thoughts` columns.** Add columns and tables in a new numbered migration (`db/migrations/00N_name.sql`). Never edit a migration that has shipped.
+- **No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`** in SQL files.
+- **Permissions live in the database where possible.** Visibility goes through `ops_can_read`; approval rules through the `ops_enforce_approval` trigger. Do not weaken either; extend tests when you touch them.
+- **Every write is attributed.** New write paths must set `created_by` / `updated_by`, `authenticated_as`, `on_behalf_of`, and log an event in `ops_record_events`.
+- **No credentials, API keys or secrets in any file.** Use environment variables. `deploy/.env` and PARA output folders are gitignored.
+- **MCP is remote HTTP only.** No stdio servers, no `claude_desktop_config.json`. OpsBrain is reached over Streamable HTTP at `/mcp`.
+- **Pin dependencies.** Exact versions in `deno.json`; commit `deno.lock`.
+- **No binary blobs** over 1 MB. **Avoid profanity** in all content.
 
-- Keep `OB1 Agent Memory` runtime-neutral. OpenClaw is the flagship launch runtime, not the product boundary.
-- Treat inferred or generated memory as evidence by default. Instruction-grade memory requires human confirmation or trusted import.
-- Avoid raw transcript, model reasoning trace, secret, and large-code-block storage by default.
-- Avoid profanity in all content. Keep docs, examples, seed data, UI copy, prompts, walkthroughs, and generated assets clean and professional.
-- Prefer diagram-first documentation for this work: diagram, short explanation, copy-paste setup, then deeper reference.
-- Carry Nate B. Jones / OB1 provenance through product surfaces, docs, diagrams, screenshots, and starter seed data. Keep it subtle and useful: micro-branding, source labels, logo marks, and provenance language instead of loud marketing copy.
-- Treat public OB1 assets as helpful-first audience growth for Nate Jones. Every public guide, recipe, tutorial, package page, release note, and walkthrough should point back to Nate's Substack and site in a natural way: https://substack.com/@natesnewsletter and https://natebjones.com.
-- Make the case by being genuinely useful. The CTA should feel earned: "Nate gives away practical systems like this" rather than generic marketing copy.
-- For ClawHub/OpenClaw publishing, do not fall back to Jonathan's personal handle or any non-Nate namespace. If `@natebjones` / Nate OB1 ownership is not available, stop and record the blocker.
+## Commits
 
-## Tracker and repository hygiene
+- Small, focused commits with a clear message (`server: ...`, `para: ...`, `db: ...`, `deploy: ...`, `docs: ...`).
+- Run `git status --short` before staging and stage only files that belong to the task.
+- Never commit `.env` files, keys, database dumps or PARA output.
 
-Standing practice (Jonathan, 2026-08-30): the ticket board and the branch list must describe reality, so nobody starts a work session by cleaning up.
+## Parallel agent worktrees
 
-- At the end of every substantial working session — and always before marking a carrier issue `Done` — audit the project's open Linear issues against what actually shipped.
-- Close as `Done` any issue whose deliverable now objectively exists, with a one-line evidence comment naming the merged pull request or the artifact.
-- Cancel any issue whose subject was cut or superseded by a recorded decision, with a one-line comment naming that decision. When a parent's children split between delivered and superseded, say which went where in one parent comment.
-- An issue that is merely old is not stale; an issue that no longer describes work anyone intends is. When ownership of a lane is unclear, leave the lane and flag it to its owner instead of judging it.
-- Delete merged branches, local and remote, after every merge (`git push origin --delete BRANCH`, then `git remote prune origin`). Close superseded pull requests with a comment saying what replaced them.
-- Keep large binaries out of git history: recordings, exports, and other heavy artifacts go to Agent Drop (or another owned store) with the link committed in their place.
+When several agents work on this repo at once, give each its own Git worktree and branch. The assigned worktree path is the boundary: do not edit sibling worktrees, and do not switch branches in the main checkout while another agent may be working. Remove a worktree with `git worktree remove <path>` once its branch is merged and it is clean.

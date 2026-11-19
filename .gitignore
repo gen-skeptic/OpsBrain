@@ -21,9 +21,15 @@ token.json
 gmail-sync-log.json
 sync-log.json
 
-# Build artifacts
+# Build artifacts (the root deno.lock is committed: it pins OpsBrain's dependencies)
 deno.lock
+!/deno.lock
 docs/walkthroughs/*/public/
 docs/assets/agent-memory/promotional/generated-backgrounds/**/result.json
 docs/assets/agent-memory/screenshots/**/.chrome-*/
 integrations/openclaw-agent-memory/dist/
+
+# OpsBrain runtime output and local config (never commit company records or keys)
+/para-output/
+/para-restricted/
+deploy/.env

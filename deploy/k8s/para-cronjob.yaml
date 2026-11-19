@@ -1,0 +1,37 @@
+# Human-readable PARA mirror, four times a day at 00:00, 06:00, 12:00 and 18:00 (timeZone below).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: opsbrain-para-export
+spec:
+  schedule: "0 0,6,12,18 * * *"
+  timeZone: America/New_York
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1993
+            runAsGroup: 1993
+            fsGroup: 1993
+          containers:
+            - name: export
+              image: opsbrain
+              args: ["task", "para:export"]
+              envFrom:
+                - configMapRef: { name: opsbrain-config }
+                - secretRef: { name: opsbrain-secrets }
+              volumeMounts:
+                - { name: para, mountPath: /data/para }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 512Mi }
+          volumes:
+            - name: para
+              persistentVolumeClaim: { claimName: opsbrain-para }

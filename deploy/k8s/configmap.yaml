@@ -1,0 +1,21 @@
+# Non-secret settings. Secrets (DATABASE_URL, API keys) go in the opsbrain-secrets Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opsbrain-config
+data:
+  OPSBRAIN_PUBLIC_URL: https://opsbrain.example.internal
+  OPSBRAIN_ALLOW_QUERY_KEY: "true"
+  OPSBRAIN_MAX_RECORD_CHARS: "50000"
+  # Any OpenAI-compatible embeddings endpoint inside your network (Ollama, vLLM, LiteLLM).
+  EMBEDDING_PROVIDER: openai
+  EMBEDDING_API_BASE: http://ollama.ai.svc.cluster.local:11434/v1
+  EMBEDDING_MODEL: nomic-embed-text
+  EMBEDDING_DIM: "768"
+  METADATA_EXTRACTION: "false"
+  TZ: America/New_York
+  PARA_TITLE: OpsBrain
+  PARA_ARCHIVE_AFTER_DAYS: "30"
+  PARA_OUTPUT_DIR: /data/para/company
+  # Restricted records go to a separate folder on the same volume; restrict who can read it.
+  PARA_RESTRICTED_DIR: /data/para/restricted

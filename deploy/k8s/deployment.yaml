@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opsbrain
+  labels: { app: opsbrain }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: opsbrain }
+  template:
+    metadata:
+      labels: { app: opsbrain }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1993
+        runAsGroup: 1993
+      initContainers:
+        - name: migrate
+          image: opsbrain
+          args: ["task", "migrate"]
+          envFrom:
+            - configMapRef: { name: opsbrain-config }
+            - secretRef: { name: opsbrain-secrets }
+      containers:
+        - name: opsbrain
+          image: opsbrain
+          args: ["task", "serve"]
+          ports:
+            - { name: http, containerPort: 8787 }
+          envFrom:
+            - configMapRef: { name: opsbrain-config }
+            - secretRef: { name: opsbrain-secrets }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }

@@ -1,3 +1,5 @@
+> **OpsBrain note:** this guide describes the upstream Open Brain community library process (`recipes/`, `schemas/`, `integrations/` and so on). It does not apply to OpsBrain's core (`server/`, `db/`, `admin/`, `para/`, `deploy/`); for that, see [AGENTS.md](AGENTS.md).
+
 # Contributing to OB1
 
 ## Before You Contribute

@@ -1,0 +1,21 @@
+{
+  "imports": {
+    "postgres": "npm:postgres@3.4.5",
+    "hono": "npm:hono@4.9.2",
+    "@hono/mcp": "npm:@hono/mcp@0.1.1",
+    "@modelcontextprotocol/sdk/": "npm:/@modelcontextprotocol/sdk@1.24.3/",
+    "zod": "npm:zod@4.1.13"
+  },
+  "tasks": {
+    "start": "deno task migrate && deno task serve",
+    "serve": "deno run --allow-net --allow-env --allow-read server/index.ts",
+    "migrate": "deno run --allow-net --allow-env --allow-read db/migrate.ts",
+    "admin": "deno run --allow-net --allow-env --allow-read --allow-write admin/opsbrain-admin.ts",
+    "para:export": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run=git para/export.ts",
+    "para:schedule": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run=git para/schedule.ts",
+    "check": "deno check server/index.ts db/migrate.ts admin/opsbrain-admin.ts para/export.ts para/schedule.ts tests/*.ts",
+    "test": "deno test --allow-net --allow-env --allow-read --allow-write --allow-run=git tests/"
+  },
+  "fmt": { "lineWidth": 140 },
+  "exclude": ["dashboards/", "recipes/", "extensions/", "integrations/", "skills/", "schemas/", "primitives/", "resources/", "docs/", "scripts/"]
+}

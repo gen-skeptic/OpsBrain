@@ -1,32 +1,26 @@
-# Security Policy
+# Security policy
 
-## Reporting a Vulnerability
+OpsBrain is a private, self-hosted system of record. See [docs/opsbrain/05-security-and-privacy.md](docs/opsbrain/05-security-and-privacy.md) for the security model, privacy rules and operating practices.
 
-If you discover a security vulnerability in this repository, please report it responsibly. **Do not open a public issue.**
+## Reporting a vulnerability
 
-Email [TODO: INSERT CONTACT EMAIL] with:
+Do not open a public issue. Report it privately to the repository owner through GitHub (a private security advisory on this repository), with:
 
-- A description of the vulnerability
-- Steps to reproduce it
-- Any relevant files or links
+- what the problem is and what it affects,
+- steps to reproduce,
+- any relevant files, versions or logs (with keys and personal data removed).
 
-We will acknowledge your report within 48 hours and aim to provide a fix or mitigation plan within 7 days.
+## In scope
 
-## Scope
+- Authentication, key handling, delegation and role checks in `server/`
+- Visibility and approval enforcement in `db/migrations/`
+- The PARA exporter leaking restricted records or writing outside its folders
+- Deployment defaults in `deploy/` that expose data or services
+- Secrets committed to the repository
 
-This policy covers the contents of this repository: contribution templates, metadata schemas, CI workflows, and community documentation. It does not cover the upstream Open Brain infrastructure (Supabase instance, MCP server, etc.).
+## If a key or record leaks
 
-## What Counts as a Vulnerability
-
-- CI workflows that could be exploited (e.g., script injection via PR titles or branch names)
-- Credentials, API keys, or secrets accidentally committed to the repo
-- Contribution templates or examples that encourage insecure practices
-
-## What Does NOT Count
-
-- Bugs in individual community contributions (report those as regular issues)
-- Feature requests or general feedback (use Discussions or Issues)
-
-## Credit
-
-We are happy to credit reporters in release notes or CONTRIBUTORS.md unless you prefer to remain anonymous.
+1. Revoke the key: `deno task admin key revoke <hash-prefix>`.
+2. Disable the principal if needed: `deno task admin principal disable <handle>`.
+3. Review `ops_record_events` and `ops_principal_keys.last_used_at` for the affected period.
+4. Record what happened as an `incident` record (restricted if it involves personal data) and follow up with a `retrospective`.

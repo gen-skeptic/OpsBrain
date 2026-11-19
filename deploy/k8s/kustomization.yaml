@@ -1,0 +1,19 @@
+# OpsBrain on Kubernetes. Review every file, then:
+#   1. Create the database (postgres-cnpg.yaml is an example for CloudNativePG).
+#   2. Create the secret from secret.example.yaml (encrypt it with SOPS or use your secret manager).
+#   3. Build and push the image (deploy/Dockerfile) to your private registry and set it below.
+#   4. kubectl apply -k deploy/k8s
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: opsbrain
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - para-pvc.yaml
+  - para-cronjob.yaml
+images:
+  - name: opsbrain
+    newName: registry.example.internal/opsbrain # your private registry
+    newTag: "0.1.0"
