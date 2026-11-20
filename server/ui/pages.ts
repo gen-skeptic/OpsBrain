@@ -28,7 +28,7 @@ const dealLink = (id: string | null, name: string | null) => (id ? html`<a href=
 export function loginBody(o: { keyLogin: boolean; ssoHint: boolean; next: string; error?: string }): Html {
   return html`<div class="login panel-cut">
   <h1 class="page-title"><span>&gt;_</span> Sign in</h1>
-  <p class="lead-sm">OpsBrain is DIO's private system of record. People only; agents connect through MCP.</p>
+  <p class="lead-sm">OpsBrain is your company's private system of record. People sign in here; agents connect through MCP.</p>
   ${o.error ? html`<p class="flash flash-err" role="alert"><strong>Error:</strong> ${o.error}</p>` : ""}
   ${o.ssoHint ? html`<p class="note">Sign in through your company SSO portal to open OpsBrain directly.</p>` : ""}
   ${o.keyLogin ? html`<form method="post" action="/login" class="form-grid">

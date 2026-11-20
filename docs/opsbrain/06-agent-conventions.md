@@ -1,6 +1,6 @@
 # 6. Conventions for agents
 
-These conventions make records from many people and agents consistent, so work can be handed off, reviewed and found later. Agent instructions (for example the experts repo's protocol) should follow them.
+These conventions make records from many people and agents consistent, so work can be handed off, reviewed and found later. Agent instructions (for example your team's shared agent protocol) should follow them.
 
 ## Before you start
 

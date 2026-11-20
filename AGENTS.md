@@ -4,7 +4,7 @@ This file is for AI coding tools (Claude Code, Codex, Cursor, OpenClaw, Hermes) 
 
 ## What this repo is
 
-OpsBrain is the private, self-hosted system of record for Dautel Intelligent Operations: a multi-user, multi-agent company database with an MCP server, forked from Open Brain (OB1) by Nate B. Jones. License: FSL-1.1-MIT (internal use and professional services allowed; no competing commercial product or service). Keep the license and notices intact.
+OpsBrain is a private, self-hosted system of record for companies run by people and AI agents: a multi-user, multi-agent company database with an MCP server and a web UI, forked from Open Brain (OB1) by Nate B. Jones. License: FSL-1.1-MIT (internal use and professional services allowed; no competing commercial product or service). Keep the license and notices intact.
 
 ```text
 server/          Deno MCP server (Hono + MCP SDK, Streamable HTTP, stateless): config, db, auth, records, crm, tools, app

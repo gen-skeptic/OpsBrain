@@ -76,9 +76,9 @@ Ask the client to call `whoami`. You should see something like:
 
 ```json
 {
-  "authenticated_as": { "handle": "erich-claude-code", "kind": "service", "role": "agent", "can_approve": false },
-  "acting_as": "erich-claude-code",
-  "may_act_as": ["dio-account-manager", "dio-quality-reviewer"]
+  "authenticated_as": { "handle": "alex-claude-code", "kind": "service", "role": "agent", "can_approve": false },
+  "acting_as": "alex-claude-code",
+  "may_act_as": ["quality-reviewer", "sales-agent"]
 }
 ```
 

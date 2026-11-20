@@ -22,7 +22,7 @@ ops_principals ──< ops_principal_keys            who is calling (hashed keys
 
 | Column | Meaning |
 | --- | --- |
-| `handle` | Unique lowercase name used everywhere (`erich`, `dio-quality-reviewer`). |
+| `handle` | Unique lowercase name used everywhere (`alex`, `quality-reviewer`). |
 | `display_name`, `job_title`, `email` | Who this is. Email is optional; leave it empty for agents. |
 | `kind` | `human`, `agent` (an AI role) or `service` (a key holder such as a Claude Code session or an integration). |
 | `role` | `owner`, `admin`, `member`, `agent`, `auditor` (see [Setup, Step 5](01-setup.md#step-5-add-the-owner)). |
@@ -88,7 +88,7 @@ These rules hold no matter which client or agent writes the record:
 4. Only a person with approval rights can clear the `financial_or_ethical` or `requires_approval` flags.
 5. Approvals go through `decide_approval`, with the person's own key and without `acting_as`.
 
-For Dautel Intelligent Operations this encodes the owner's rule: final deployments to customers, financial transactions and any decision with financial or ethical considerations need the owner's approval; everything else is decided by the accountable owner without escalation.
+A typical policy built on these rules: final deployments to customers, financial transactions and any decision with financial or ethical considerations need the owner's approval; everything else is decided by the accountable owner without escalation.
 
 ## CRM
 

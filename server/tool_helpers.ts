@@ -7,7 +7,7 @@ export const PRIVACY =
   " Never store client confidential data (client systems, customer records, credentials, health or financial data) or client deliverables in OpsBrain; store company records about the work, and link to deliverables in the client's own systems.";
 
 export const actingAs = z.string().optional().describe(
-  "Handle of the agent you are acting as (e.g. dio-chief-of-staff). Required when one key is shared by several agents in a session; must be delegated to your key.",
+  "Handle of the agent you are acting as (e.g. sales-agent). Required when one key is shared by several agents in a session; must be delegated to your key.",
 );
 
 export const ro = { readOnlyHint: true };
