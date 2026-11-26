@@ -22,7 +22,7 @@
 
 **OpsBrain is the private system of record for a company run by people and AI agents.** Every person, agent and integration has its own identity and key. Everything they record, from task cards, QA results and decisions to meetings, risks, the sales pipeline and playbooks, lands in one Postgres database on your own server, with who did it, on whose behalf, and every change since.
 
-Agents reach it through MCP. People use a private web UI for the CRM and the approval queue. Four times a day, a copy is written to plain markdown folders organized with the PARA method, so anyone can read it without an AI tool.
+Agents reach it through MCP. People use a private web UI for the CRM and the approval queue, and the Open Brain dashboard to browse, search and capture what the company remembers. Four times a day, a copy is written to plain markdown folders organized with the PARA method, so anyone can read it without an AI tool.
 
 Use it as the system of record for everything about how your company runs, except client deliverables: those stay in your clients' systems and your delivery repositories, and clients never see OpsBrain.
 
@@ -42,6 +42,7 @@ Use it as the system of record for everything about how your company runs, excep
 | **Approvals the database enforces** | Anything financial or ethical, and final deployments to customers, waits as `pending` until a person with approval rights decides. Agents can't approve, even with direct database access. |
 | **A built-in CRM** | Companies, contacts, a deal pipeline with a weighted forecast, and every sales conversation, linked to proposals, contracts, invoices and engagements. |
 | **A web UI for people** | Pipeline board, companies, contacts, deals, an approval queue and a record view, in the Dautel Design System. Sign in with your key or through SSO. |
+| **The Open Brain dashboard** | Open Brain's own dashboard, restyled in the Dautel Design System: stats, browse, search by meaning, a workflow board, duplicates, audit and capture, over every record you can read. |
 | **A readable copy** | Markdown folders organized with PARA (Projects, Areas, Resources, Archive), rebuilt at 00:00, 06:00, 12:00 and 18:00. |
 | **Privacy by default** | Self-hosted, local embeddings, restricted records for HR and legal, and no client data or deliverables. |
 
@@ -356,6 +357,23 @@ People sign in at `<OPSBRAIN_PUBLIC_URL>/crm` with their own key or through sing
 
 ---
 
+## >_ The dashboard
+
+The [Open Brain dashboard](docs/opsbrain/08-dashboard.md), OB1's web app for its thoughts, runs on OpsBrain in the Dautel Design System. People sign in with their own key and browse, search, capture and organize everything they can read: notes, task cards, decisions, meeting notes and the rest. It talks to OpsBrain's Open Brain REST API (`/open-brain-rest`), so every change is attributed and kept in the record's history, restricted records stay private, and deleting archives. Start it with the Compose profile `dashboard`.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/opsbrain/dashboard-home.png" alt="Dashboard with totals, types, top topics, the workflow summary, Add to Brain and recent records"></td>
+<td width="50%"><img src="docs/assets/opsbrain/dashboard-workflow.png" alt="Workflow board with tasks and ideas in New, Planning, Active, Review and Done"></td>
+</tr>
+<tr>
+<td align="center"><b>Dashboard</b>: totals, types, topics, capture and recent records</td>
+<td align="center"><b>Workflow</b>: task cards and ideas by status; drag to move</td>
+</tr>
+</table>
+
+---
+
 ## >_ The PARA method
 
 [PARA](https://fortelabs.com/blog/para/), from Tiago Forte, organizes information by **how actionable it is**, not by topic. Everything belongs to one of four places, and things move between them as their status changes:
@@ -447,6 +465,7 @@ Contribution rules for the library are in [CONTRIBUTING.md](CONTRIBUTING.md). Op
 | **Sensitive topics stay restricted** | `visibility: restricted` for HR, pay and legal, enforced on every read and kept out of the main mirror |
 | **Decisions stay with people** | Approvals, screens and won deals are enforced by database triggers |
 | **A safe web UI** | People only; hashed sessions in HttpOnly SameSite=Strict cookies, CSRF tokens, same-origin checks, a no-script CSP, escaped templates |
+| **A dashboard on the same rules** | The dashboard's REST API takes people's own keys only, reads through the same visibility rules and writes through the same attributed code; nothing is deleted |
 | **Everything is audited** | Every change records the actor, the key and the fields changed |
 
 Read the full [security and privacy guide](docs/opsbrain/05-security-and-privacy.md), including backups, retention and the license.
@@ -464,6 +483,7 @@ Read the full [security and privacy guide](docs/opsbrain/05-security-and-privacy
 | [5. Security and privacy](docs/opsbrain/05-security-and-privacy.md) | Privacy rules, access control, network, keys, data protection, license |
 | [6. Agent conventions](docs/opsbrain/06-agent-conventions.md) | How agents record task cards, QA, decisions, approvals and CRM work |
 | [7. CRM](docs/opsbrain/07-crm.md) | Companies, contacts, deals, activities, pipeline stages, the web UI, single sign-on |
+| [8. Dashboard](docs/opsbrain/08-dashboard.md) | The Open Brain dashboard: pages, how Open Brain fields map onto records, setup, the REST API |
 
 ---
 
@@ -481,7 +501,9 @@ OPSBRAIN_TEST_ADMIN_URL=postgres://postgres:postgres@localhost:5432/postgres den
 
 ```text
 server/            MCP server: auth, permissions, records, CRM, tools, HTTP app
+server/rest.ts     the Open Brain REST API the dashboard uses
 server/ui/         web UI for people: sessions, pages, Dautel Design System assets
+dashboard/         the Open Brain dashboard (Next.js) in the Dautel Design System
 db/migrations/     SQL migrations, applied once each on start
 admin/             the admin CLI (principals, keys, delegations, areas, projects, seed, reembed)
 para/              PARA exporter (records and CRM pages) and its scheduler
@@ -491,7 +513,7 @@ tools/readme/      renders this README's images from the design system and demo 
 docs/opsbrain/     the guides above
 ```
 
-CI runs the type check, all tests against Postgres with pgvector, and a Compose file check on every push and pull request. Rules for changing the code, for people and AI agents alike, are in [AGENTS.md](AGENTS.md).
+CI runs the type check, all tests against Postgres with pgvector, a dashboard build and a Compose file check on every push and pull request. Rules for changing the code, for people and AI agents alike, are in [AGENTS.md](AGENTS.md).
 
 To refresh the README images, run `node tools/readme/render.js` for the banner and diagrams. The screenshots come from a scratch database filled by `tools/readme/demo-data.ts` and `tools/readme/screenshots.js`.
 

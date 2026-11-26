@@ -9,11 +9,12 @@ OpsBrain is a private, self-hosted system of record for companies run by people 
 ```text
 server/          Deno MCP server (Hono + MCP SDK, Streamable HTTP, stateless): config, db, auth, records, crm, tools, app
 server/ui/       web UI for people (escaping html templates, sessions, pages, routes, design system assets)
+dashboard/       the Open Brain dashboard (OB1's Next.js app) restyled in the Dautel Design System; talks to server/rest.ts
 db/migrations/   SQL migrations, applied once each by db/migrate.ts ({{EMBEDDING_DIM}} is substituted)
 admin/           opsbrain-admin CLI (principals, keys, delegations, areas, projects, seed, reembed)
 para/            PARA markdown exporter (para.ts and crm.ts pure logic, export.ts I/O) and scheduler
 deploy/          Dockerfile, docker-compose.yml, .env.example, seed.example.json, k8s/
-tests/           unit tests, plus end-to-end tests (integration, crm, ui) that need OPSBRAIN_TEST_ADMIN_URL
+tests/           unit tests, plus end-to-end tests (integration, crm, ui, rest) that need OPSBRAIN_TEST_ADMIN_URL
 docs/opsbrain/   OpsBrain documentation (keep it in step with the code)
 ```
 
@@ -29,7 +30,7 @@ deno task check
 OPSBRAIN_TEST_ADMIN_URL=postgres://postgres:postgres@localhost:5432/postgres deno task test
 ```
 
-Run both before every commit that touches `server/`, `db/`, `admin/`, `para/` or `tests/`. Add or update tests with every behavior change.
+Run both before every commit that touches `server/`, `db/`, `admin/`, `para/` or `tests/`. For `dashboard/`, run `npm ci` and `npm run build` there (with `SESSION_SECRET` and `NEXT_PUBLIC_API_URL` set). Add or update tests with every behavior change.
 
 ## Guard rails
 
@@ -43,7 +44,8 @@ Run both before every commit that touches `server/`, `db/`, `admin/`, `para/` or
 - **No credentials, API keys or secrets in any file.** Use environment variables. `deploy/.env` and PARA output folders are gitignored.
 - **MCP is remote HTTP only.** No stdio servers, no `claude_desktop_config.json`. OpsBrain is reached over Streamable HTTP at `/mcp`.
 - **Web UI safety.** Build HTML only with the escaping `html` template in `server/ui/html.ts`; no inline scripts or styles (the CSP forbids them); every POST route goes through the session + CSRF + same-origin wrapper in `server/ui/routes.ts`. The UI follows the Dautel Design System (`server/ui/assets/dautel.css` is a copy; change the design system upstream first).
-- **Pin dependencies.** Exact versions in `deno.json`; commit `deno.lock`.
+- **The dashboard stays OB1's.** `dashboard/` is OB1's Open Brain dashboard; change its styling (Dautel tokens in `dashboard/app/globals.css` and `dautel-tokens.css`) and branding, and keep its pages and behavior. OpsBrain-specific behavior belongs in the REST API (`server/rest.ts`), which must read through `ops_can_read`, write through `records.ts`, and never delete.
+- **Pin dependencies.** Exact versions in `deno.json` and `dashboard/package.json`; commit `deno.lock` and `dashboard/package-lock.json`.
 - **No binary blobs** over 1 MB. **Avoid profanity** in all content.
 
 ## Commits

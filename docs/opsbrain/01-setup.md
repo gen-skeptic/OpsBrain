@@ -197,6 +197,14 @@ People use the CRM and the approval queue in the browser at `<OPSBRAIN_PUBLIC_UR
 
 To use your own sales stages, add `pipeline_stages` to the seed file and seed again ([CRM: The pipeline](07-crm.md#the-pipeline)).
 
+For the Open Brain dashboard (browse, search, capture and the workflow board), set `DASHBOARD_SESSION_SECRET` in `deploy/.env` and start the `dashboard` profile:
+
+```bash
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env --profile dashboard up -d --build
+```
+
+Publish `127.0.0.1:3000` through your proxy on its own hostname; see [Dashboard](08-dashboard.md).
+
 ## Step 11. Back up
 
 OpsBrain is the company's system of record. Back it up before you rely on it.

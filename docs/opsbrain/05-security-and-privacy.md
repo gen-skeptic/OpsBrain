@@ -23,6 +23,7 @@ OpsBrain holds how the company runs. It is private by design: it runs on servers
 | Decision rights | Approval of financial or ethical records is enforced by a database trigger: only an active human with `can_approve`. |
 | Audit trail | Every change is an event with actor, key holder and changed fields. Events are append-only through the tools. |
 | CRM decisions | Clearing or declining a company screen and marking a deal won need an active human with `can_approve`, enforced by database triggers. |
+| Dashboard | The Open Brain dashboard's REST API (`/open-brain-rest`) takes people's own keys only (agents and services get 403), reads through `ops_can_read`, writes through the same attributed code as the tools, and archives instead of deleting. The dashboard keeps the key in an encrypted HttpOnly session cookie and calls the API from its server, never from the browser. It sends no telemetry and loads nothing from other sites. Turn the API off with `OPSBRAIN_REST_ENABLED=false`. |
 | Web UI | People only. Sign-in with your own key or through an SSO proxy that also presents `OPSBRAIN_UI_PROXY_SECRET`. Sessions are random IDs stored hashed, in HttpOnly SameSite=Strict cookies (Secure over HTTPS) that expire after `OPSBRAIN_UI_SESSION_HOURS`. Every form needs the session's CSRF token and must come from the same origin. Pages are sent with a strict Content Security Policy (no scripts at all), `X-Frame-Options: DENY` and `no-store` caching, and every value is HTML-escaped. |
 
 ## Network
@@ -31,7 +32,8 @@ OpsBrain holds how the company runs. It is private by design: it runs on servers
 - The database port is not published at all.
 - Prefer a VPN for team access. Use a public tunnel only for clients that require it (Claude Desktop and claude.ai custom connectors), with a dedicated, revocable key.
 - Set `OPSBRAIN_ALLOW_QUERY_KEY=false` if no client needs `?key=`, so keys never appear in URLs or proxy logs.
-- The server accepts only `POST` for MCP; `GET` returns 405 except for the web UI pages (`/login`, `/crm`, `/approvals`, `/records`, `/assets`).
+- The server accepts only `POST` for MCP; `GET` returns 405 except for the web UI pages (`/login`, `/crm`, `/approvals`, `/records`, `/assets`) and the dashboard's REST API (`/open-brain-rest`).
+- The dashboard container also binds to localhost (port 3000). Publish it through the same TLS proxy, on its own hostname.
 - If you put SSO in front of the UI, keep the proxy secret long and random, make the proxy strip the user header from incoming requests, and don't publish the server port anywhere the proxy can be bypassed.
 
 ## Keys
