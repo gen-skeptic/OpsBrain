@@ -6,18 +6,20 @@ The existing VPS holds the runtime `.env`, human and agent keys, database and ex
 
 ## One-time provisioning
 
-The owner runs `install.py` with sudo after reviewing `receiver.py` and a `manifest.json` containing its SHA-256 plus separate `opsbrain` and `experts` Ed25519 public keys. It installs a root-owned receiver and a locked-password `dio-deploy` account. Each authorized key forces one exact sudo command, with no shell, PTY, agent forwarding or port forwarding. CI cannot upload scripts, change Compose files or replace the receiver. The private keys belong only in each repository's GitHub `production` environment.
+The owner runs `install.py` with sudo after reviewing `receiver.py` and its public-key manifest. It installs a root-owned receiver and a locked-password `dio-deploy` account with two exact sudo commands. Existing scoped SSH keys give no shell, PTY or forwarding access. CI cannot upload scripts, change Compose files or replace the receiver.
 
-Configure the `production` environment to allow only branch `main`:
+Hosted GitHub runners could not reach this VPS's SSH port. Production therefore uses `install-webhook.py` to install a signed HTTPS relay running as `dio-deploy`. Its listener binds only to the existing private Docker proxy bridge gateway on port 8765. Pangolin routes `https://opsbrain.dautel.cloud/_cicd/{opsbrain,experts}` to it, using the existing TLS hostname. No public TCP port or SSH firewall rule is added. Separate HMAC-SHA256 keys authenticate the app, timestamp and exact request body; requests older than five minutes are refused. The relay invokes only the existing per-app sudo receiver.
+
+The relay installer expects `webhook.py`, its SHA-256 in `webhook-manifest.json`, and a private `webhook.env` containing `OPSBRAIN_DEPLOY_SECRET` and `EXPERTS_DEPLOY_SECRET` (independent random 32-byte hex values). It moves that environment file to root-private `/etc/dio-cicd/webhook.env` and removes the staging copy. Never commit a real environment file or authentication value.
+
+Configure each repository's `production` environment to allow only branch `main`:
 
 | Setting | Location | Value |
 | --- | --- | --- |
-| `DEPLOY_HOST` | Environment variable | VPS hostname or IP |
-| `DEPLOY_USER` | Environment variable | `dio-deploy` |
-| `DEPLOY_SSH_PRIVATE_KEY` | Environment secret | This repository's scoped private key |
-| `DEPLOY_KNOWN_HOSTS` | Environment secret | Host key verified through the existing trusted SSH connection |
+| `DEPLOY_URL` | Environment variable | `https://opsbrain.dautel.cloud/_cicd/opsbrain` (Experts uses `/experts`) |
+| `DEPLOY_WEBHOOK_SECRET` | Environment secret | This application's HMAC key |
 
-GitHub's job-scoped `GITHUB_TOKEN` with `packages: read` is used for the VPS pull through stdin. Its temporary Docker login directory is removed after pulling; no registry PAT is installed. The receiver allows only the fixed GHCR repositories, validates SHA-256 digests and OCI source/revision labels, and serializes the two applications with one server lock. Workflows also serialize their main runs and refuse deployments older than the last successful run number.
+GitHub's job-scoped `GITHUB_TOKEN` with `packages: read` travels in the signed HTTPS request, then stdin to the receiver for the private image pull. Redirects are refused. Its temporary Docker login directory is removed after pulling; no registry PAT is installed. The receiver allows only the fixed GHCR repositories, validates SHA-256 digests and OCI source/revision labels, and serializes the two applications with one server lock. Workflows also serialize their main runs and refuse deployments older than the last successful run number.
 
 ## Rollout and verification
 
@@ -29,6 +31,6 @@ Sanitized results are in `/var/lib/dio-cicd/status/{opsbrain,experts}.json`; fai
 
 ## Recovery
 
-Use a private sudo session. Read the failure report first. The selected release is the last Compose layer `deploy/ci.override.yml`; restore its preceding copy from the reported backup directory, or remove only that layer if `previous-config.json` says it did not exist. Start the same services with all three Compose layers and `--no-build`, keeping the original project name and `.env`. Verify health, authentication and memory before reopening work. Do not restore the database dump over newer writes or rerun the old bootstrap installer. Updating this receiver or rotating its two scoped SSH public keys requires a reviewed sudo provisioning run.
+Use a private sudo session. Read the failure report first. The selected release is the last Compose layer `deploy/ci.override.yml`; restore its preceding copy from the reported backup directory, or remove only that layer if `previous-config.json` says it did not exist. Start the same services with all three Compose layers and `--no-build`, keeping the original project name and `.env`. Verify health, authentication and memory before reopening work. Do not restore the database dump over newer writes or rerun the old bootstrap installer. Updating the receiver/relay or rotating server authentication keys requires a reviewed sudo provisioning run.
 
 GitHub references: [publishing Docker images](https://docs.github.com/actions/publishing-packages/publishing-docker-images) and [Container registry authentication](https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-container-registry).

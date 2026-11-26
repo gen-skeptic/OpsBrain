@@ -136,10 +136,8 @@ jobs:
       - name: Deploy tested image digests and verify health
         env:
           DEPLOY_APP: opsbrain
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
           GH_TOKEN: ${{ github.token }}
           CORE_DIGEST: ${{ needs.images.outputs.core }}
           DASHBOARD_DIGEST: ${{ needs.images.outputs.dashboard }}
