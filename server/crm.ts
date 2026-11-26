@@ -96,7 +96,22 @@ async function updateRow(tx: Tx, table: string, id: string, set: Row): Promise<R
 const UUID_COLS = new Set(["company_id", "primary_contact_id", "owner_id", "created_by", "updated_by", "authenticated_as", "on_behalf_of", "screened_by"]);
 const cast = (col: string, n: number) =>
   col === "fields" ? `$${n}::jsonb` : col === "tags" ? `$${n}::text[]` : UUID_COLS.has(col) ? `$${n}::uuid` : `$${n}`;
-const param = (col: string, v: unknown) => (col === "fields" ? JSON.stringify(v ?? {}) : v);
+// The driver serializes objects for jsonb parameters itself; a pre-serialized string would be stored as a JSON string.
+const param = (col: string, v: unknown) => (col === "fields" ? (v ?? {}) : v);
+
+/** A row's fields as an object (rows saved before migration 005 may still hold a JSON string). */
+function fieldsOf(row: Row | null): Row {
+  const f = row?.fields;
+  if (typeof f === "string") {
+    try {
+      const parsed = JSON.parse(f);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return f && typeof f === "object" ? f : {};
+}
 
 function checkVersion(current: Row, expected?: number) {
   if (expected !== undefined && expected !== current.version) {
@@ -119,21 +134,43 @@ export type CompanyInput = {
   city?: string; region?: string; country?: string; lifecycle?: string; source?: string; owner?: string;
   tags?: string[]; notes?: string; fields?: Row; flag_for_screen?: boolean; screen_note?: string;
   archived?: boolean; expected_version?: number; comment?: string;
+  /** Tags to add to the company's current tags (or to `tags`, when both are given). */
+  add_tags?: string[];
 };
 
 const COMPANY_COLS = ["name", "domain", "website", "industry", "size_band", "phone", "city", "region", "country", "lifecycle", "source", "owner_id", "tags", "notes", "fields"];
 
+function companyDomain(input: CompanyInput): string | undefined {
+  if (input.domain === undefined) return undefined;
+  if (input.domain === "") return "";
+  const d = normalizeDomain(input.domain);
+  if (!d) throw new InputError(`"${input.domain}" is not a domain`);
+  return d;
+}
+
+/**
+ * Find the company an upsert means: by id, then domain, then a unique exact name among active companies. When a domain
+ * was given and no company has it, the name only matches a company that has no domain yet.
+ */
+async function findCompany(input: CompanyInput, domain: string | undefined): Promise<{ current: Row | null; byName: boolean }> {
+  if (input.id) return { current: (await db()`SELECT * FROM crm_companies WHERE id = ${await resolveCompanyId(input.id)}`)[0], byName: false };
+  if (domain) {
+    const byDomain = (await db()`SELECT * FROM crm_companies WHERE domain = ${domain}`)[0];
+    if (byDomain) return { current: byDomain, byName: false };
+  }
+  if (input.name?.trim()) {
+    const byName = await db()`
+      SELECT * FROM crm_companies
+       WHERE lower(name) = lower(${input.name.trim()}) AND archived_at IS NULL AND (${!domain} OR domain IS NULL)`;
+    if (byName.length === 1) return { current: byName[0], byName: true };
+  }
+  return { current: null, byName: false };
+}
+
 export async function upsertCompany(ctx: Ctx, input: CompanyInput) {
   writer(ctx);
-  const domain = input.domain !== undefined ? (input.domain === "" ? "" : normalizeDomain(input.domain) ?? (() => { throw new InputError(`"${input.domain}" is not a domain`); })()) : undefined;
-  let current: Row | null = null;
-  if (input.id) current = (await db()`SELECT * FROM crm_companies WHERE id = ${await resolveCompanyId(input.id)}`)[0];
-  else if (domain) current = (await db()`SELECT * FROM crm_companies WHERE domain = ${domain}`)[0] ?? null;
-  let matchedByName = false;
-  if (!current && !input.id && input.name && !domain) {
-    const byName = await db()`SELECT * FROM crm_companies WHERE lower(name) = lower(${input.name.trim()}) AND archived_at IS NULL`;
-    if (byName.length === 1) { current = byName[0]; matchedByName = true; }
-  }
+  const domain = companyDomain(input);
+  const { current, byName: matchedByName } = await findCompany(input, domain);
   // A name used to find the company is not a rename (keep the stored spelling and casing).
   if (matchedByName) input = { ...input, name: undefined };
   if (current) checkVersion(current, input.expected_version);
@@ -141,9 +178,12 @@ export async function upsertCompany(ctx: Ctx, input: CompanyInput) {
   if (input.lifecycle && !LIFECYCLES.includes(input.lifecycle as never)) throw new InputError(`lifecycle must be one of ${LIFECYCLES.join(", ")}`);
   const ownerId = input.owner !== undefined ? await principalId(input.owner, "owner") : undefined;
   checkOwnerChange(ctx, current, ownerId);
+  const tags = input.add_tags?.length
+    ? [...new Set([...(input.tags ?? current?.tags ?? []), ...input.add_tags.map((t) => t.trim()).filter(Boolean)])]
+    : input.tags;
   const { set, changes } = diff(current, {
-    ...input, name: input.name?.trim(), domain, owner_id: ownerId,
-    fields: input.fields !== undefined ? { ...(current?.fields ?? {}), ...input.fields } : undefined,
+    ...input, name: input.name?.trim(), domain, owner_id: ownerId, tags,
+    fields: input.fields !== undefined ? { ...fieldsOf(current), ...input.fields } : undefined,
   }, COMPANY_COLS);
   if (input.flag_for_screen && current?.screen_status !== "pending") {
     set.screen_status = "pending";
@@ -157,7 +197,7 @@ export async function upsertCompany(ctx: Ctx, input: CompanyInput) {
   }
   if (current && !Object.keys(set).length) {
     if (input.comment) await commentCrm(ctx, "company", current.id, input.comment);
-    return { id: current.id, version: current.version, created: false, changed: false };
+    return { id: current.id as string, name: current.name as string, version: current.version as number, created: false, changed: false, screen_status: current.screen_status as string | null };
   }
   try {
     return await db().begin(async (tx: Tx) => {
@@ -168,11 +208,97 @@ export async function upsertCompany(ctx: Ctx, input: CompanyInput) {
           authenticated_as: ctx.auth.id, on_behalf_of: ctx.onBehalfOf,
         });
       await event(tx, "company", row.id, ctx, action, changes, input.comment ?? null);
-      return { id: row.id as string, version: row.version as number, created: !current, changed: true, screen_status: row.screen_status };
+      return { id: row.id as string, name: row.name as string, version: row.version as number, created: !current, changed: true, screen_status: row.screen_status as string | null };
     });
   } catch (err) {
     translate(err);
   }
+}
+
+export const IMPORT_MAX = 500;
+
+/** Company columns an import fills when they are empty (or replaces, with overwrite). */
+const IMPORT_FILL = ["domain", "website", "industry", "size_band", "phone", "city", "region", "country", "lifecycle", "source", "notes"] as const;
+
+export type ImportResult = { row: number; name: string; id?: string; status: "created" | "updated" | "unchanged" | "skipped" | "error" | "new" | "existing"; flagged?: boolean; note?: string };
+
+const blankValue = (v: unknown) => v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length);
+
+/**
+ * Load many companies at once, for example a researched prospect list. Each row is matched like crm_upsert_company
+ * (id, then domain, then exact name) and saved on its own, with the same attribution and history, so one bad row
+ * doesn't stop the rest. An import adds to what the CRM knows and never takes it away: on an existing company it fills
+ * only empty columns (unless overwrite), merges tags and fields, never renames, never reassigns the owner unless
+ * overwrite, never resets a screen that was already decided, and leaves archived companies alone.
+ */
+export async function importCompanies(
+  ctx: Ctx,
+  input: { companies: CompanyInput[]; defaults?: CompanyInput; overwrite?: boolean; dry_run?: boolean; comment?: string },
+) {
+  writer(ctx);
+  const rows = input.companies ?? [];
+  if (!rows.length) throw new InputError("Give at least one company");
+  if (rows.length > IMPORT_MAX) throw new InputError(`Import at most ${IMPORT_MAX} companies per call; split the list`);
+  const defaults: CompanyInput = { ...(input.defaults ?? {}) };
+  delete defaults.id;
+  const results: ImportResult[] = [];
+  for (const [i, raw] of rows.entries()) {
+    const row: CompanyInput = { ...defaults, ...raw };
+    const tags = [...new Set([...(defaults.tags ?? []), ...(raw.tags ?? []), ...(defaults.add_tags ?? []), ...(raw.add_tags ?? [])].map((t) => String(t).trim()).filter(Boolean))];
+    const fields = defaults.fields || raw.fields ? { ...(defaults.fields ?? {}), ...(raw.fields ?? {}) } : undefined;
+    const name = (row.name ?? row.domain ?? row.id ?? "").toString().trim();
+    try {
+      const domain = companyDomain(row);
+      const { current } = await findCompany(row, domain);
+      if (!current && !row.name?.trim()) throw new InputError("name is required for a new company");
+      if (current?.archived_at) {
+        results.push({ row: i, name: current.name, id: current.id, status: "skipped", note: "archived; restore it first" });
+        continue;
+      }
+      if (input.dry_run) {
+        results.push({ row: i, name: current?.name ?? name, id: current?.id, status: current ? "existing" : "new", flagged: !!row.flag_for_screen && !current?.screen_status });
+        continue;
+      }
+      let change: CompanyInput;
+      if (!current) change = { ...row, tags, fields, add_tags: undefined, comment: input.comment };
+      else {
+        change = { id: current.id, add_tags: tags, comment: input.comment };
+        for (const c of IMPORT_FILL) {
+          const v = c === "domain" ? domain : row[c];
+          if (v === undefined || v === "") continue;
+          if (input.overwrite || blankValue(current[c])) (change as Row)[c] = v;
+        }
+        if (input.overwrite && row.owner !== undefined) change.owner = row.owner;
+        if (fields) {
+          const extra = Object.fromEntries(Object.entries(fields).filter(([k]) => input.overwrite || fieldsOf(current)[k] === undefined));
+          if (Object.keys(extra).length) change.fields = extra;
+        }
+        if (row.flag_for_screen && !current.screen_status) {
+          change.flag_for_screen = true;
+          change.screen_note = row.screen_note;
+        }
+      }
+      const r = await upsertCompany(ctx, change);
+      results.push({
+        row: i, name: r!.name, id: r!.id,
+        status: r!.created ? "created" : r!.changed ? "updated" : "unchanged",
+        flagged: !!change.flag_for_screen && r!.screen_status === "pending",
+      });
+    } catch (err) {
+      results.push({ row: i, name, status: "error", note: (err as Error).message?.slice(0, 300) ?? String(err) });
+    }
+  }
+  const count = (s: ImportResult["status"]) => results.filter((r) => r.status === s).length;
+  return {
+    dry_run: !!input.dry_run,
+    total: rows.length,
+    created: count("created"), updated: count("updated"), unchanged: count("unchanged"),
+    new: count("new"), existing: count("existing"),
+    skipped: count("skipped"),
+    flagged_for_screen: results.filter((r) => r.flagged).length,
+    failed: count("error"),
+    results,
+  };
 }
 
 /** Clear or decline a company's screen (for example a conflict-of-interest check). People with approval rights only. */
@@ -220,7 +346,7 @@ export async function upsertContact(ctx: Ctx, input: ContactInput) {
   const companyId = input.company !== undefined ? (input.company === "" ? null : await resolveCompanyId(input.company)) : undefined;
   const { set, changes } = diff(current, {
     ...input, full_name: input.full_name?.trim(), email, owner_id: ownerId, company_id: companyId,
-    fields: input.fields !== undefined ? { ...(current?.fields ?? {}), ...input.fields } : undefined,
+    fields: input.fields !== undefined ? { ...fieldsOf(current), ...input.fields } : undefined,
   }, CONTACT_COLS);
   if (set.consent !== undefined) set.consent_at = new Date().toISOString();
   let action = current ? "update" : "create";
@@ -230,7 +356,7 @@ export async function upsertContact(ctx: Ctx, input: ContactInput) {
   }
   if (current && !Object.keys(set).length) {
     if (input.comment) await commentCrm(ctx, "contact", current.id, input.comment);
-    return { id: current.id, version: current.version, created: false, changed: false };
+    return { id: current.id, name: current.full_name, version: current.version, created: false, changed: false };
   }
   try {
     return await db().begin(async (tx: Tx) => {
@@ -241,7 +367,7 @@ export async function upsertContact(ctx: Ctx, input: ContactInput) {
           authenticated_as: ctx.auth.id, on_behalf_of: ctx.onBehalfOf,
         });
       await event(tx, "contact", row.id, ctx, action, changes, input.comment ?? null);
-      return { id: row.id as string, version: row.version as number, created: !current, changed: true };
+      return { id: row.id as string, name: row.full_name as string, version: row.version as number, created: !current, changed: true };
     });
   } catch (err) {
     translate(err);
@@ -306,7 +432,7 @@ export async function upsertDeal(ctx: Ctx, input: DealInput) {
     ...input, name: input.name?.trim(), company_id: companyId, primary_contact_id: contactId, owner_id: ownerId, stage,
     amount: money(input.amount), recurring_monthly: money(input.recurring_monthly),
     currency: input.currency?.toUpperCase(),
-    fields: input.fields !== undefined ? { ...(current?.fields ?? {}), ...input.fields } : undefined,
+    fields: input.fields !== undefined ? { ...fieldsOf(current), ...input.fields } : undefined,
   }, DEAL_COLS);
   let action = current ? (set.stage ? "stage" : "update") : "create";
   if (input.archived !== undefined && current && input.archived !== (current.archived_at !== null)) {
@@ -315,7 +441,7 @@ export async function upsertDeal(ctx: Ctx, input: DealInput) {
   }
   if (current && !Object.keys(set).length) {
     if (input.comment) await commentCrm(ctx, "deal", current.id, input.comment);
-    return { id: current.id, version: current.version, created: false, changed: false, stage: current.stage };
+    return { id: current.id, name: current.name, version: current.version, created: false, changed: false, stage: current.stage };
   }
   try {
     return await db().begin(async (tx: Tx) => {
@@ -336,7 +462,7 @@ export async function upsertDeal(ctx: Ctx, input: DealInput) {
         await updateRow(tx, "crm_companies", company.id, { lifecycle: next, updated_by: ctx.actor.id, authenticated_as: ctx.auth.id });
         await event(tx, "company", company.id, ctx, "update", { lifecycle: { from: company.lifecycle, to: next } }, `Deal "${row.name}" is ${st.name}`);
       }
-      return { id: row.id as string, version: row.version as number, created: !current, changed: true, stage: row.stage };
+      return { id: row.id as string, name: row.name as string, version: row.version as number, created: !current, changed: true, stage: row.stage };
     });
   } catch (err) {
     translate(err);

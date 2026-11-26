@@ -176,5 +176,61 @@ Deno.test({ name: "CRM end to end", ignore: !ADMIN_URL, sanitizeOps: false, sani
       assertEquals(activities.length, 1);
       assertStringIncludes(await read("README.md"), "[Pipeline](2-Areas/CRM/Pipeline.md)");
     });
+
+    await t.step("a bulk import adds companies without overwriting what the CRM knows", async () => {
+      const seeded = await call(S, "crm_upsert_company", { acting_as: "dio-a", name: "Bright Dental", domain: "brightdental.example", industry: "Dental", source: "referral" });
+      const bright = seeded.data.id;
+      const rows = [
+        { name: "Bright Dental Group", domain: "brightdental.example", industry: "Dental practice", city: "Delray Beach", tags: ["tier-a"], fields: { research_rank: 1 } },
+        { name: "Cool Air Co", domain: "coolair.example", industry: "HVAC contractor", flag_for_screen: true, screen_note: "Employer-boundary screen before scoping" },
+        { name: "No Domain Title", industry: "Title and escrow" },
+        { name: "Broken", domain: "not a domain" },
+      ];
+      const defaults = { lifecycle: "prospect", source: "research-2026-11-21", owner: "dio-b", tags: ["boynton-beach"] };
+      const dry = await call(S, "crm_import_companies", { acting_as: "dio-a", companies: rows, defaults, dry_run: true });
+      assert(!dry.isError, dry.text);
+      assertEquals([dry.data.new, dry.data.existing, dry.data.failed], [2, 1, 1]);
+      const before = (await sql`SELECT count(*)::int AS n FROM crm_companies`)[0].n;
+
+      const r = await call(S, "crm_import_companies", { acting_as: "dio-a", companies: rows, defaults });
+      assert(!r.isError, r.text);
+      assertStringIncludes(r.text, "Imported 4 companies: 2 created, 1 updated, 0 unchanged, 0 skipped, 1 flagged for screen, 1 failed.");
+      assertEquals(r.data.results.map((x: { name: string; status: string }) => [x.name, x.status]), [
+        ["Bright Dental", "updated"], ["Cool Air Co", "created"], ["No Domain Title", "created"], ["Broken", "error"],
+      ]);
+      const [a] = await sql`SELECT name, industry, city, lifecycle, source, tags, fields, owner_id = (SELECT id FROM ops_principals WHERE handle = 'dio-a') AS same_owner FROM crm_companies WHERE id = ${bright}`;
+      // Filled the empty values; kept the name, industry, source and owner it already had.
+      assertEquals([a.name, a.industry, a.city, a.lifecycle, a.source, a.same_owner], ["Bright Dental", "Dental", "Delray Beach", "prospect", "referral", true]);
+      assertEquals(a.tags, ["boynton-beach", "tier-a"]);
+      assertEquals(a.fields.research_rank, 1);
+      const [cool] = await sql`SELECT id, screen_status, owner_id = (SELECT id FROM ops_principals WHERE handle = 'dio-b') AS owned, on_behalf_of IS NOT NULL AS attributed FROM crm_companies WHERE domain = 'coolair.example'`;
+      assertEquals([cool.screen_status, cool.owned, cool.attributed], ["pending", true, true]);
+      const [ev] = await sql`SELECT count(*)::int AS n FROM crm_events WHERE entity_id = ${cool.id} AND action = 'create'`;
+      assertEquals(ev.n, 1);
+
+      // A decided screen is never reset, and repeating the import changes nothing.
+      await sql`UPDATE crm_companies SET screen_status = 'cleared', screened_by = (SELECT id FROM ops_principals WHERE handle = 'erich') WHERE id = ${cool.id}`;
+      const again = await call(S, "crm_import_companies", { acting_as: "dio-a", companies: rows.slice(0, 3), defaults });
+      assertEquals([again.data.created, again.data.updated, again.data.unchanged, again.data.flagged_for_screen], [0, 0, 3, 0]);
+      assertEquals((await sql`SELECT screen_status FROM crm_companies WHERE id = ${cool.id}`)[0].screen_status, "cleared");
+      assertEquals((await sql`SELECT count(*)::int AS n FROM crm_companies`)[0].n, before + 2);
+
+      // A name match fills in the domain of a company that had none.
+      const dom = await call(S, "crm_import_companies", { acting_as: "dio-a", companies: [{ name: "no domain title", domain: "nodomaintitle.example" }] });
+      assertEquals(dom.data.results[0].status, "updated");
+      assertEquals((await sql`SELECT count(*)::int AS n FROM crm_companies WHERE domain = 'nodomaintitle.example'`)[0].n, 1);
+
+      const one = await call(S, "crm_upsert_company", { acting_as: "dio-a", id: bright, add_tags: ["tier-a", "dental"] });
+      assertStringIncludes(one.text, 'Updated company "Bright Dental"');
+      assertEquals((await sql`SELECT tags FROM crm_companies WHERE id = ${bright}`)[0].tags, ["boynton-beach", "tier-a", "dental"]);
+      // Fields saved as a JSON string before migration 005 are merged as objects, and stored as objects again.
+      await sql`UPDATE crm_companies SET fields = to_jsonb('{"legacy": true}'::text) WHERE id = ${bright}`;
+      await call(S, "crm_upsert_company", { acting_as: "dio-a", id: bright, fields: { checked: "2026-11-26" } });
+      const [f] = await sql`SELECT jsonb_typeof(fields) AS t, fields FROM crm_companies WHERE id = ${bright}`;
+      assertEquals([f.t, f.fields.legacy, f.fields.checked], ["object", true, "2026-11-26"]);
+
+      const auditor = await call(keys.ava, "crm_import_companies", { companies: rows.slice(0, 1) });
+      assertStringIncludes(auditor.text, "Not allowed");
+    });
   });
 });

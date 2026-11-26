@@ -20,28 +20,59 @@ const common = {
   acting_as: actingAs,
 };
 
+/** The company columns, shared by crm_upsert_company and each row of crm_import_companies. */
+const companyShape = {
+  name: z.string().optional().describe("Required for a new company"),
+  domain: z.string().optional().describe("Web domain, e.g. acme.com (unique)"),
+  website: z.string().optional(), industry: z.string().optional(),
+  size_band: z.enum(crm.SIZE_BANDS).optional().describe("Employees"),
+  phone: z.string().optional().describe("Main business line"),
+  city: z.string().optional(), region: z.string().optional(), country: z.string().optional(),
+  lifecycle: z.enum(crm.LIFECYCLES).optional(),
+  source: z.string().optional().describe("Where it came from: referral, website, event, outbound, research-YYYY-MM-DD..."),
+  flag_for_screen: z.boolean().optional(), screen_note: z.string().optional().describe("Why it needs a screen"),
+  owner: common.owner, tags: common.tags,
+  add_tags: z.array(z.string()).optional().describe("Tags to add to the company's current tags"),
+  notes: common.notes, fields: common.fields,
+};
+
 export function registerCrmTools(server: McpServer, auth: Principal) {
   server.registerTool("crm_upsert_company", {
     title: "Create or update CRM company",
     description:
-      `Create or update a company in the CRM. Matches an existing company by id, then domain, then exact name, so repeating a call updates instead of duplicating. Set flag_for_screen when a prospect needs the owner's screen (for example a conflict-of-interest check); deals then cannot pass the screened stages until a person with approval rights clears it.${CRM_PRIVACY}`,
+      `Create or update a company in the CRM. Matches an existing company by id, then domain, then exact name, so repeating a call updates instead of duplicating. Set flag_for_screen when a prospect needs the owner's screen (for example a conflict-of-interest check); deals then cannot pass the screened stages until a person with approval rights clears it. For more than a few companies, use crm_import_companies.${CRM_PRIVACY}`,
     annotations: { ...rw, idempotentHint: true },
     inputSchema: {
       id: z.string().optional().describe("Company ID, domain or exact name of an existing company"),
-      name: z.string().optional().describe("Required for a new company"),
-      domain: z.string().optional().describe("Web domain, e.g. acme.com (unique)"),
-      website: z.string().optional(), industry: z.string().optional(),
-      size_band: z.enum(crm.SIZE_BANDS).optional().describe("Employees"),
-      phone: z.string().optional().describe("Main business line"),
-      city: z.string().optional(), region: z.string().optional(), country: z.string().optional(),
-      lifecycle: z.enum(crm.LIFECYCLES).optional(),
-      source: z.string().optional().describe("Where it came from: referral, website, event, outbound, marketplace..."),
-      flag_for_screen: z.boolean().optional(), screen_note: z.string().optional().describe("Why it needs a screen"),
+      ...companyShape,
       ...common,
     },
   }, run(auth, async (ctx, a: any) => {
     const r = await crm.upsertCompany(ctx, a);
-    return ok(r, `${r!.created ? "Created" : r!.changed ? "Updated" : "No change to"} company ${r!.id}`);
+    return ok(r, `${r!.created ? "Created" : r!.changed ? "Updated" : "No change to"} company "${r!.name}" (${r!.id})`);
+  }));
+
+  server.registerTool("crm_import_companies", {
+    title: "Import CRM companies",
+    description:
+      `Create or update up to ${crm.IMPORT_MAX} companies in one call, for example a researched prospect list. Each row is matched like crm_upsert_company (id, then domain, then exact name) and saved on its own with full attribution and history, so one bad row doesn't stop the rest; repeating an import is safe. On existing companies it fills only empty values (overwrite: true replaces them), adds tags and fields, never renames, never resets a screen that was already decided and skips archived companies. defaults apply to every row (tags are combined). Returns counts and each row's result by name; use dry_run first to see which rows are new.${CRM_PRIVACY}`,
+    annotations: { ...rw, idempotentHint: true },
+    inputSchema: {
+      companies: z.array(z.object({ id: z.string().optional().describe("ID, domain or exact name of an existing company"), ...companyShape }))
+        .min(1).max(crm.IMPORT_MAX).describe("The companies, one object per company"),
+      defaults: z.object(companyShape).optional().describe("Values for every row that doesn't set its own, e.g. lifecycle, source, owner, tags"),
+      overwrite: z.boolean().optional().describe("Replace values that are already set (default false: fill only empty ones)"),
+      dry_run: z.boolean().optional().describe("Match the rows and report which are new, without saving"),
+      comment: common.comment,
+      acting_as: actingAs,
+    },
+  }, run(auth, async (ctx, a: any) => {
+    const r = await crm.importCompanies(ctx, a);
+    const counts = r.dry_run
+      ? `${r.new} new, ${r.existing} already in the CRM`
+      : `${r.created} created, ${r.updated} updated, ${r.unchanged} unchanged`;
+    const summary = `${r.dry_run ? "Dry run of" : "Imported"} ${r.total} companies: ${counts}, ${r.skipped} skipped, ${r.flagged_for_screen} ${r.dry_run ? "to flag" : "flagged"} for screen, ${r.failed} failed.`;
+    return { ...ok(r, summary), ...(r.failed === r.total ? { isError: true } : {}) };
   }));
 
   server.registerTool("crm_screen_company", {
@@ -74,7 +105,7 @@ export function registerCrmTools(server: McpServer, auth: Principal) {
     },
   }, run(auth, async (ctx, a: any) => {
     const r = await crm.upsertContact(ctx, a);
-    return ok(r, `${r!.created ? "Created" : r!.changed ? "Updated" : "No change to"} contact ${r!.id}`);
+    return ok(r, `${r!.created ? "Created" : r!.changed ? "Updated" : "No change to"} contact "${r!.name}" (${r!.id})`);
   }));
 
   server.registerTool("crm_upsert_deal", {
@@ -102,7 +133,7 @@ export function registerCrmTools(server: McpServer, auth: Principal) {
     },
   }, run(auth, async (ctx, a: any) => {
     const r = await crm.upsertDeal(ctx, a);
-    return ok(r, `${r!.created ? "Created" : r!.changed ? "Updated" : "No change to"} deal ${r!.id} (stage ${r!.stage})`);
+    return ok(r, `${r!.created ? "Created" : r!.changed ? "Updated" : "No change to"} deal "${r!.name}" (${r!.id}, stage ${r!.stage})`);
   }));
 
   server.registerTool("crm_start_engagement", {
