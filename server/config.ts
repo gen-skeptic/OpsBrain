@@ -36,6 +36,9 @@ export const config = {
   get llmApiKey() { return env("LLM_API_KEY", ""); },
   get llmModel() { return env("LLM_MODEL", "llama3.1:8b"); },
 
+  // The Open Brain REST API at /open-brain-rest, used by the Open Brain dashboard (dashboard/). People's keys only.
+  get restEnabled() { return bool("OPSBRAIN_REST_ENABLED", true); },
+
   // Web UI (CRM and approvals) for people. Agents use MCP.
   get uiEnabled() { return bool("OPSBRAIN_UI_ENABLED", true); },
   /** key: sign in with your OpsBrain key; header: SSO through a trusted reverse proxy; both. */

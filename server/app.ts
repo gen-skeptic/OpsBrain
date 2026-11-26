@@ -6,6 +6,7 @@ import { buildServer } from "./tools.ts";
 import { config } from "./config.ts";
 import { db } from "./db.ts";
 import { mountUi } from "./ui/routes.ts";
+import { agentMemoryStub, restApi } from "./rest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,6 +50,12 @@ export function buildApp(): Hono {
       return c.json({ ok: false }, 503);
     }
   });
+
+  // The Open Brain REST API for the Open Brain dashboard (dashboard/). Registered before the MCP catch-all.
+  if (config.restEnabled) {
+    app.route("/open-brain-rest", restApi());
+    app.route("/agent-memory-api", agentMemoryStub());
+  }
 
   // Web UI for people (CRM, approvals). Registered before the MCP catch-all; agents use MCP.
   if (config.uiEnabled) mountUi(app);
