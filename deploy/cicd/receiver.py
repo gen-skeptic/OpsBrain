@@ -5,7 +5,6 @@ Input is a small JSON release descriptor on stdin, never a shell command or a
 Compose file. Only fixed GHCR repositories and the existing service definitions
 are used. Credentials, databases, networking and proxy settings stay on the VPS.
 """
-import copy
 from datetime import datetime, timezone
 import fcntl
 import hashlib
@@ -136,6 +135,14 @@ def volume(container, destination):
     return next(m.get('Name') for m in container['Mounts'] if m['Destination'] == destination)
 
 
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with path.open('rb') as source:
+        for block in iter(lambda: source.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def deploy_opsbrain(images, backup, state):
     current = service('opsbrain', 'opsbrain')
     pg_volume = volume(service('opsbrain', 'db'), '/var/lib/postgresql/data')
@@ -192,7 +199,7 @@ const t=await r.text();const result=JSON.parse(t.trim().startsWith('{')?t:t.spli
         if json.loads(psql(database, fingerprint_sql)) != before:
             raise RuntimeError('Live migration changed existing record contents or identity counts')
         state['database_backup'] = str(dump)
-        state['database_backup_sha256'] = hashlib.sha256(dump.read_bytes()).hexdigest()
+        state['database_backup_sha256'] = file_sha256(dump)
         state['records_before'] = before['records']
         state['migration_rehearsal'] = 'passed'
         state['previous_runtime_compatibility'] = 'passed'
@@ -322,7 +329,7 @@ def main():
         return
     images = validate_payload(app, payload)
     (ROOT / 'ci').mkdir(parents=True, exist_ok=True, mode=0o700)
-    with open('/run/lock/dio-cicd.lock', 'w') as lock:
+    with open(ROOT / 'ci/deploy.lock', 'w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         prior_path = STATUS / (app + '.json')
         prior = json.loads(prior_path.read_text()) if prior_path.exists() else {}
