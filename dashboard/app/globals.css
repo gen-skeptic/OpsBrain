@@ -1,0 +1,229 @@
+@import "tailwindcss";
+@import "./dautel-tokens.css";
+
+/* OpsBrain dashboard: the Open Brain dashboard in the Dautel Design System. The dashboard's own color names map to
+   Dautel role tokens, so every theme (data-theme on <html>) works and nothing here is a hard-coded flavor value. */
+@theme inline {
+  --color-bg-primary: var(--ink);
+  --color-bg-surface: var(--surface);
+  --color-bg-elevated: var(--surface-strong);
+  --color-bg-hover: var(--surface-hover);
+  --color-border: var(--rule);
+  --color-border-subtle: var(--rule-soft);
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--muted);
+  --color-text-muted: var(--quiet);
+  /* The dashboard's accent ("violet" in its components) is Dautel blue: primary action and focus. */
+  --color-violet: var(--blue);
+  --color-violet-dim: color-mix(in srgb, var(--blue) 82%, var(--ink));
+  --color-violet-glow: color-mix(in srgb, var(--blue) 18%, transparent);
+  --color-violet-surface: color-mix(in srgb, var(--blue) 10%, transparent);
+  --color-success: var(--mint);
+  --color-warning: var(--peach);
+  --color-danger: var(--danger);
+  --color-info: var(--lavender);
+  /* Palette colors the components use directly, mapped to the nearest Dautel role. */
+  --color-white: var(--on-accent);
+  --color-slate-400: var(--muted);
+  --color-slate-500: var(--quiet);
+  --color-slate-600: var(--rule);
+  --color-blue-400: var(--blue);
+  --color-blue-500: var(--blue);
+  --color-emerald-400: var(--mint);
+  --color-emerald-500: var(--mint);
+  --color-amber-400: var(--peach);
+  --color-amber-500: var(--peach);
+  --color-orange-400: var(--peach);
+  --color-orange-500: var(--peach);
+  --color-yellow-400: var(--lavender);
+  --color-yellow-500: var(--lavender);
+  --color-violet-400: var(--lavender);
+  --color-violet-500: var(--lavender);
+  --color-red-300: var(--danger);
+  --color-red-400: var(--danger);
+  --color-red-500: var(--danger);
+  --font-sans: "Manrope Variable", Manrope, system-ui, sans-serif;
+  --font-mono: "JetBrainsMono Nerd Font", "JetBrainsMono NF", "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  /* Dautel corners: small and square. */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+}
+
+html {
+  background: var(--ink);
+}
+
+body {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings, navigation, labels and controls are set in mono, as in every Dautel interface. */
+h1, h2, h3, nav, label, button, input, select, textarea, code, pre, kbd, th {
+  font-family: var(--font-mono);
+}
+h1, h2 {
+  letter-spacing: -0.03em;
+}
+
+:focus-visible {
+  outline: var(--stroke-focus) solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* Page ground: deep ink with the Dautel one-pixel 80px topology grid, fading out below the fold. */
+.ob1-graphite-bg {
+  position: relative;
+  isolation: isolate;
+  background: var(--ink);
+}
+
+.ob1-graphite-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.25;
+  background-image:
+    linear-gradient(var(--rule-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 60%);
+}
+
+.ob1-brand-signature {
+  position: fixed;
+  top: 1rem;
+  right: 1.25rem;
+  z-index: 1;
+  pointer-events: none;
+  color: var(--quiet);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ob1-brand-kicker {
+  display: block;
+  color: var(--lavender);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.ob1-brand-stamp {
+  color: var(--quiet);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ob1-login-panel {
+  border: var(--stroke-hairline) solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+.ob1-glass-panel {
+  border: var(--stroke-hairline) solid var(--rule);
+  background: var(--surface);
+}
+
+.ob1-frost-panel {
+  border: var(--stroke-hairline) solid var(--rule);
+  background: var(--surface-strong);
+}
+
+.ob1-section-label {
+  color: var(--quiet);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ob1-command-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: var(--stroke-hairline) solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.ob1-command-button:hover {
+  border-color: var(--blue);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.ob1-memory-row {
+  position: relative;
+  transition: background-color 160ms ease;
+}
+
+.ob1-memory-row:hover {
+  background: var(--color-bg-hover);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-violet-glow);
+  color: var(--color-text-primary);
+}
+
+/* Phone landscape: hide desktop sidebar, keep mobile topbar, remove sidebar margin */
+@media (orientation: landscape) and (max-height: 600px) {
+  aside {
+    display: none !important;
+  }
+  main {
+    margin-left: 0 !important;
+    padding-top: 48px !important;
+  }
+  /* Force mobile topbar visible in landscape */
+  .md\:hidden {
+    display: flex !important;
+  }
+}

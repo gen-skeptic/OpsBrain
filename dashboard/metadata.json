@@ -1,0 +1,36 @@
+{
+  "name": "OpsBrain dashboard",
+  "description": "OB1's Open Brain dashboard for OpsBrain, in the Dautel Design System: browse, search, capture and manage records with session auth, smart ingest, reflections, a workflow board and quality auditing.",
+  "category": "dashboards",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.1.0",
+  "requires": {
+    "open_brain": false,
+    "services": [
+      "OpsBrain with the Open Brain REST API (/open-brain-rest)"
+    ],
+    "tools": [
+      "Node.js 22+"
+    ]
+  },
+  "tags": [
+    "dashboard",
+    "web-ui",
+    "nextjs",
+    "search",
+    "capture",
+    "ingest",
+    "browse",
+    "audit",
+    "kanban",
+    "workflow",
+    "drag-and-drop"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-03-23",
+  "updated": "2026-03-31"
+}
