@@ -183,6 +183,10 @@ Deno.test({ name: "OpsBrain end to end", ignore, sanitizeOps: false, sanitizeRes
       await call(keys.erich, "decide_approval", { id: decisionId, decision: "request_changes", comment: "Cap it at 10%" });
       const resubmitted = await call(keys["dio-a"], "update_record", { id: decisionId, fields: { discount_percent: 10 } });
       assertEquals(resubmitted.data.approval_status, "pending");
+      // Fields stay an object and updates merge into it.
+      const merged = await call(keys["dio-a"], "get_record", { id: decisionId });
+      assertEquals(typeof merged.data.fields, "object");
+      assertEquals(merged.data.fields.discount_percent, 10);
       await call(keys.erich, "decide_approval", { id: decisionId, decision: "approve" });
     });
 

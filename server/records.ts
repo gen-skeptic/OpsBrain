@@ -256,7 +256,8 @@ export async function updateRecord(ctx: Ctx, ref: string, input: UpdateInput) {
       if (c === "fields") return `fields = $${i + 2}::jsonb`;
       return `${c} = $${i + 2}`;
     });
-    const values = cols.map((c) => (c === "fields" ? JSON.stringify(set[c]) : set[c]));
+    // The driver serializes objects for jsonb parameters itself; a pre-serialized string would be stored as a JSON string.
+    const values = cols.map((c) => set[c]);
     const [row] = await tx.unsafe(
       `UPDATE thoughts SET ${assignments.join(", ")} WHERE id = $1 RETURNING id, version, approval_status`,
       [r.id, ...values] as never[],
