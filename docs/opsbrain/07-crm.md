@@ -114,7 +114,8 @@ Contact emails and phone numbers are left out of the mirror ("email on file") un
 
 | Tool | What it does |
 | --- | --- |
-| `crm_upsert_company` | Create or update a company; `flag_for_screen` with a `screen_note` asks for a screen |
+| `crm_upsert_company` | Create or update a company; `flag_for_screen` with a `screen_note` asks for a screen; `add_tags` adds tags without replacing the others |
+| `crm_import_companies` | Load up to 500 companies in one call, for example a researched prospect list (see below) |
 | `crm_screen_company` | Clear or decline a screen (people with approval rights only) |
 | `crm_upsert_contact` | Create or update a contact, including consent and do-not-contact |
 | `crm_upsert_deal` | Create or update a deal: stage, values, expected close, next step, lost reason |
@@ -123,6 +124,17 @@ Contact emails and phone numbers are left out of the mirror ("email on file") un
 | `crm_get` | A company, contact or deal with everything linked to it and its history |
 | `crm_search`, `crm_list` | Find and filter companies, contacts and deals |
 | `crm_pipeline` | The board as data: stages, totals, weighted forecast, stale deals, overdue next steps, pending screens |
+
+### Importing a list of companies
+
+`crm_import_companies` takes a list of companies and optional `defaults` (for example `lifecycle`, `source`, `owner` and `tags`) and saves each one as `crm_upsert_company` would, matched by ID, then domain, then exact name. Every row is attributed and kept in the company's history, and a bad row is reported without stopping the rest. An import only adds to what the CRM already knows:
+
+- On an existing company it fills empty values and leaves set ones alone (`overwrite: true` replaces them). It adds tags and fields, never renames the company and never changes its owner unless `overwrite` is set.
+- `flag_for_screen` on a row starts a screen only when the company has never been screened, so re-running an import never reopens a screen that was cleared or declined.
+- Archived companies are skipped.
+- `dry_run: true` reports which rows are new and which are already in the CRM, without saving.
+
+The result lists each row by name with its status (`created`, `updated`, `unchanged`, `skipped` or `error`), so a long load can be checked and repeated safely.
 
 ## Privacy
 

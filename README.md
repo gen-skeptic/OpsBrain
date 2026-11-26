@@ -300,6 +300,7 @@ Most of the time you just ask your agent. These are the moves that matter:
 | Record a decision | "Record the decision to use Postgres for the portal, with the options we considered." | `create_record` (decision) |
 | Get something approved | "Record the discount as a decision that needs my approval." Then approve it on the web UI's **Approvals** page. | `financial_or_ethical: true` holds it as `pending` |
 | Find what we decided | "Search OpsBrain for what we decided about client portals." | `search_records` (semantic, keyword fallback) |
+| Load a prospect list | "Import the companies from this research into the CRM as prospects, and flag the ones that need my screen." | `crm_import_companies` (up to 500 per call) |
 | Log a sales call | "Log a call with Dana at Acme: she wants intake live before March." Or **Log activity** on the deal page. | `crm_log_activity` |
 | See the pipeline | Open `/crm`, or ask "What deals are stale?" | `crm_pipeline` |
 | Close a deal | Mark it **Won** on the deal page (approvers only), then **Create engagement project**. | `crm_upsert_deal`, `crm_start_engagement` |

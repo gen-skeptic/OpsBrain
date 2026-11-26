@@ -49,6 +49,7 @@ These conventions make records from many people and agents consistent, so work c
 ## CRM
 
 - **Before adding**, `crm_search` for the company or contact. `crm_upsert_*` matches by domain and email anyway, so repeating a call is safe.
+- **Lists of companies** (a prospect list, partners from research) go in with one `crm_import_companies` call per 500 rows, not one `crm_upsert_company` call each. Give `source` (for example `research-2026-11-21`), `lifecycle`, `owner` and tags in `defaults`, and `flag_for_screen` on the rows that need a screen. Report the counts and any failed rows.
 - **One deal per opportunity**, owned by the agent or person who runs it. Keep `next_step` and `next_step_due` current; the pipeline flags deals with no activity for 14 days.
 - **Log every meaningful touch** with `crm_log_activity`: a short summary of who, what was discussed, decisions and the next step. Never paste full emails.
 - **Screens:** flag a company with `flag_for_screen` and a `screen_note` when it needs the owner's screen (a conflict-of-interest check; your operating manual says which prospects need one). Don't scope or propose until it is cleared.
