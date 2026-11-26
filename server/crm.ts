@@ -136,6 +136,8 @@ export type CompanyInput = {
   archived?: boolean; expected_version?: number; comment?: string;
   /** Tags to add to the company's current tags (or to `tags`, when both are given). */
   add_tags?: string[];
+  /** Keep the comment only when something changed (imports, so a repeated import adds no history). */
+  comment_on_change_only?: boolean;
 };
 
 const COMPANY_COLS = ["name", "domain", "website", "industry", "size_band", "phone", "city", "region", "country", "lifecycle", "source", "owner_id", "tags", "notes", "fields"];
@@ -196,7 +198,7 @@ export async function upsertCompany(ctx: Ctx, input: CompanyInput) {
     action = input.archived ? "archive" : "unarchive";
   }
   if (current && !Object.keys(set).length) {
-    if (input.comment) await commentCrm(ctx, "company", current.id, input.comment);
+    if (input.comment && !input.comment_on_change_only) await commentCrm(ctx, "company", current.id, input.comment);
     return { id: current.id as string, name: current.name as string, version: current.version as number, created: false, changed: false, screen_status: current.screen_status as string | null };
   }
   try {
@@ -262,7 +264,7 @@ export async function importCompanies(
       let change: CompanyInput;
       if (!current) change = { ...row, tags, fields, add_tags: undefined, comment: input.comment };
       else {
-        change = { id: current.id, add_tags: tags, comment: input.comment };
+        change = { id: current.id, add_tags: tags, comment: input.comment, comment_on_change_only: true };
         for (const c of IMPORT_FILL) {
           const v = c === "domain" ? domain : row[c];
           if (v === undefined || v === "") continue;

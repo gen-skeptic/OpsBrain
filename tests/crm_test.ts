@@ -210,8 +210,10 @@ Deno.test({ name: "CRM end to end", ignore: !ADMIN_URL, sanitizeOps: false, sani
 
       // A decided screen is never reset, and repeating the import changes nothing.
       await sql`UPDATE crm_companies SET screen_status = 'cleared', screened_by = (SELECT id FROM ops_principals WHERE handle = 'erich') WHERE id = ${cool.id}`;
-      const again = await call(S, "crm_import_companies", { acting_as: "dio-a", companies: rows.slice(0, 3), defaults });
+      const events = (await sql`SELECT count(*)::int AS n FROM crm_events`)[0].n;
+      const again = await call(S, "crm_import_companies", { acting_as: "dio-a", companies: rows.slice(0, 3), defaults, comment: "Imported from research" });
       assertEquals([again.data.created, again.data.updated, again.data.unchanged, again.data.flagged_for_screen], [0, 0, 3, 0]);
+      assertEquals((await sql`SELECT count(*)::int AS n FROM crm_events`)[0].n, events, "a repeated import adds no history");
       assertEquals((await sql`SELECT screen_status FROM crm_companies WHERE id = ${cool.id}`)[0].screen_status, "cleared");
       assertEquals((await sql`SELECT count(*)::int AS n FROM crm_companies`)[0].n, before + 2);
 
