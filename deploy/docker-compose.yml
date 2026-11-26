@@ -3,6 +3,8 @@
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 # Add local embeddings (recommended, keeps everything on your hardware):
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env --profile local-ai up -d --build
+# Add the dashboard (browse, search, capture and the workflow board; set DASHBOARD_SESSION_SECRET first):
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env --profile dashboard up -d --build
 name: opsbrain
 
 x-opsbrain-env: &opsbrain-env
@@ -11,6 +13,7 @@ x-opsbrain-env: &opsbrain-env
   OPSBRAIN_ALLOW_QUERY_KEY: ${OPSBRAIN_ALLOW_QUERY_KEY:-true}
   OPSBRAIN_MAX_RECORD_CHARS: ${OPSBRAIN_MAX_RECORD_CHARS:-50000}
   OPSBRAIN_UI_ENABLED: ${OPSBRAIN_UI_ENABLED:-true}
+  OPSBRAIN_REST_ENABLED: ${OPSBRAIN_REST_ENABLED:-true}
   OPSBRAIN_UI_AUTH: ${OPSBRAIN_UI_AUTH:-key}
   OPSBRAIN_UI_USER_HEADER: ${OPSBRAIN_UI_USER_HEADER:-X-authentik-username}
   OPSBRAIN_UI_PROXY_SECRET: ${OPSBRAIN_UI_PROXY_SECRET:-}
@@ -82,6 +85,30 @@ services:
       # The human-readable mirror lands here on the host. Share it read-only (Obsidian, file share, private git).
       - ../para-output:/data/para
       - ../para-restricted:/data/para-restricted
+
+  # The Open Brain dashboard for people (dashboard/), in the Dautel Design System. People sign in with their own
+  # OpsBrain key; the dashboard's server calls OpsBrain's /open-brain-rest on this network.
+  dashboard:
+    build:
+      context: ../dashboard
+      args:
+        OPSBRAIN_API_URL: http://opsbrain:8787/open-brain-rest
+        OPSBRAIN_UI_THEME: ${OPSBRAIN_UI_THEME:-dautel}
+    image: opsbrain-dashboard:local
+    profiles: ["dashboard"]
+    restart: unless-stopped
+    depends_on:
+      opsbrain: { condition: service_healthy }
+    environment:
+      NEXT_PUBLIC_API_URL: http://opsbrain:8787/open-brain-rest
+      SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-}
+      AUTH_COOKIE_SECURE: ${DASHBOARD_COOKIE_SECURE:-true}
+      RESTRICTED_PASSPHRASE_HASH: ${DASHBOARD_RESTRICTED_PASSPHRASE_HASH:-}
+    read_only: true
+    tmpfs: [/tmp]
+    # Bound to localhost. Publish it through your reverse proxy with TLS, never directly.
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-3000}:3000"
 
   ollama:
     image: ollama/ollama:0.12.6

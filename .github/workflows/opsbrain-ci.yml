@@ -37,3 +37,26 @@ jobs:
         run: |
           cp deploy/.env.example deploy/.env
           docker compose -f deploy/docker-compose.yml --env-file deploy/.env config --quiet
+
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Build the dashboard (types and pages)
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_URL: http://opsbrain:8787/open-brain-rest
+          SESSION_SECRET: ci-build-placeholder-never-used-at-runtime
+        run: npm run build
